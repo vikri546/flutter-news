@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../widgets/theme_toggle_button.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
+import '../providers/language_provider.dart';
+import '../utils/strings.dart';
 
 class AboutScreen extends StatefulWidget {
   final VoidCallback? onNavigateToHome;
@@ -81,6 +84,8 @@ class _AboutScreenState extends State<AboutScreen>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final textColor = isDark ? Colors.grey[400] : Colors.grey[600];
+    final strings =
+        AppStrings(context.watch<LanguageProvider>().locale.languageCode);
 
     return WillPopScope(
       onWillPop: () async {
@@ -90,9 +95,9 @@ class _AboutScreenState extends State<AboutScreen>
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text(
-            'About',
-            style: TextStyle(
+          title: Text(
+            strings.about,
+            style: const TextStyle(
               fontFamily: 'DMSans',
               fontWeight: FontWeight.bold,
             ),
@@ -133,7 +138,9 @@ class _AboutScreenState extends State<AboutScreen>
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(24),
                       child: Image.asset(
-                        isDark ? 'assets/images/logo_dark.png' : 'assets/images/logo_light.png',
+                        isDark
+                            ? 'assets/images/logo_dark.png'
+                            : 'assets/images/logo_light.png',
                         width: 150,
                         height: 150,
                         fit: BoxFit.contain,
@@ -152,10 +159,12 @@ class _AboutScreenState extends State<AboutScreen>
                   ),
                   const SizedBox(height: 32),
                   // Description
-                  const Text(
-                    "d'talk is your premier source for the latest news and articles. Stay informed with our carefully curated content from various categories, designed to keep you updated on what matters most.",
+                  Text(
+                    strings.isEn
+                        ? "d'talk is your premier source for the latest news and articles. Stay informed with our carefully curated content from various categories, designed to keep you updated on what matters most."
+                        : "d'talk adalah sumber utama Anda untuk berita dan artikel terbaru. Tetap terinformasi dengan konten pilihan dari berbagai kategori, dirancang untuk membuat Anda selalu update pada hal-hal penting.",
                     textAlign: TextAlign.center,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 16,
                     ),
                   ),
@@ -163,26 +172,26 @@ class _AboutScreenState extends State<AboutScreen>
                   // Developer info with staggered animations
                   _buildAnimatedListTile(
                     icon: Icons.code,
-                    title: 'Developed by',
+                    title: strings.isEn ? 'Developed by' : 'Dikembangkan oleh',
                     subtitle: 'Vikri Ardiansyah',
                     delay: 0.0,
                   ),
                   const Divider(),
                   _buildAnimatedListTile(
                     icon: Icons.email,
-                    title: 'Contact',
+                    title: strings.isEn ? 'Contact' : 'Kontak',
                     subtitle: 'vikriardiansyah3162@gmail.com',
                     delay: 0.1,
                   ),
                   const Divider(),
                   _buildAnimatedListTile(
                     icon: Icons.language,
-                    title: 'Website',
+                    title: strings.isEn ? 'Website' : 'Situs',
                     subtitle: 'https://dtalk-aconymous.vercel.app/',
                     delay: 0.2,
                   ),
                   const SizedBox(height: 32),
-                  
+
                   // Subscribe button
                   TweenAnimationBuilder<double>(
                     tween: Tween<double>(begin: 0.0, end: 1.0),
@@ -197,24 +206,25 @@ class _AboutScreenState extends State<AboutScreen>
                     child: ElevatedButton.icon(
                       onPressed: _launchSubscriptionForm,
                       icon: const Icon(Icons.notifications_active),
-                      label: const Text(
-                        'Support Me!',
-                        style: TextStyle(
+                      label: Text(
+                        strings.isEn ? 'Support Me!' : 'Dukung Saya!',
+                        style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       style: ElevatedButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 24, vertical: 12),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
                         ),
                       ),
                     ),
                   ),
-                  
+
                   const SizedBox(height: 24),
-                  
+
                   // Feedback section
                   Container(
                     padding: const EdgeInsets.all(16),
@@ -224,9 +234,11 @@ class _AboutScreenState extends State<AboutScreen>
                     ),
                     child: Column(
                       children: [
-                        const Text(
-                          'Help Me to Improve',
-                          style: TextStyle(
+                        Text(
+                          strings.isEn
+                              ? 'Help Me to Improve'
+                              : 'Bantu Saya Meningkatkan',
+                          style: const TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
                           ),
@@ -234,7 +246,9 @@ class _AboutScreenState extends State<AboutScreen>
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          'I appreciate your feedback! Share your suggestions and ideas to help me continue to enhance your news experience. Your input is crucial as I continue to develop and refine this application.',
+                          strings.isEn
+                              ? 'I appreciate your feedback! Share your suggestions and ideas to help me continue to enhance your news experience. Your input is crucial as I continue to develop and refine this application.'
+                              : 'Saya menghargai masukan Anda! Bagikan saran dan ide Anda untuk membantu saya terus meningkatkan pengalaman membaca berita Anda. Masukan Anda sangat penting seiring saya mengembangkan dan menyempurnakan aplikasi ini.',
                           style: TextStyle(
                             fontSize: 14,
                             color: textColor,
@@ -244,11 +258,13 @@ class _AboutScreenState extends State<AboutScreen>
                       ],
                     ),
                   ),
-                  
-                                    const SizedBox(height: 32),
+
+                  const SizedBox(height: 32),
                   // Copyright
                   Text(
-                    "© ${DateTime.now().year} d'talk. All rights reserved.",
+                    strings.isEn
+                        ? "© ${DateTime.now().year} d'talk. All rights reserved."
+                        : "© ${DateTime.now().year} d'talk. Hak cipta dilindungi.",
                     style: TextStyle(
                       fontSize: 14,
                       color: textColor,

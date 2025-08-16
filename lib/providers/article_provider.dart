@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../models/article.dart';
 import '../repositories/article_repository.dart';
 import '../utils/app_exceptions.dart';
+import '../services/background_notification_service.dart';
 
 enum ArticleLoadingStatus {
   initial,
@@ -14,6 +15,8 @@ enum ArticleLoadingStatus {
 
 class ArticleProvider with ChangeNotifier {
   final ArticleRepository _repository;
+  final BackgroundNotificationService _backgroundService =
+      BackgroundNotificationService();
 
   // Articles data
   List<Article> _articles = [];
@@ -30,6 +33,13 @@ class ArticleProvider with ChangeNotifier {
   List<Article> _searchResults = [];
   ArticleLoadingStatus _searchStatus = ArticleLoadingStatus.initial;
 
+  // Language / country for feed
+  String _countryCode = 'us';
+  String get countryCode => _countryCode;
+
+  // Previous articles for comparison
+  List<Article> _previousArticles = [];
+
   // Getters
   List<Article> get articles => _articles;
   String get currentCategory => _currentCategory;
@@ -43,6 +53,18 @@ class ArticleProvider with ChangeNotifier {
 
   ArticleProvider({ArticleRepository? repository})
       : _repository = repository ?? ArticleRepository();
+
+  // Set country (based on language) and refresh
+  Future<void> setCountryCode(String countryCode) async {
+    if (_countryCode == countryCode) return;
+    _countryCode = countryCode;
+    _currentPage = 1;
+    _hasMorePages = true;
+    _articles = [];
+    _status = ArticleLoadingStatus.loading;
+    notifyListeners();
+    await loadArticles(refresh: true);
+  }
 
   // Load initial articles
   Future<void> loadArticles({bool refresh = false}) async {
@@ -66,10 +88,17 @@ class ArticleProvider with ChangeNotifier {
         _currentCategory,
         forceRefresh: refresh,
         page: _currentPage,
+        country: _countryCode,
       );
 
       if (_currentPage == 1) {
+        _previousArticles = List.from(_articles);
         _articles = newArticles;
+
+        // Check for new articles and send notifications
+        if (refresh && _articles.isNotEmpty) {
+          await _checkForNewArticles();
+        }
       } else {
         // Filter out duplicates when adding more pages
         final uniqueNewArticles = newArticles
@@ -93,6 +122,27 @@ class ArticleProvider with ChangeNotifier {
     }
 
     notifyListeners();
+  }
+
+  // Check for new articles and send notifications
+  Future<void> _checkForNewArticles() async {
+    if (_previousArticles.isEmpty) return;
+
+    // Find new articles (articles that weren't in the previous list)
+    final newArticles = _articles
+        .where((article) => !_previousArticles
+            .any((prevArticle) => prevArticle.id == article.id))
+        .toList();
+
+    if (newArticles.isNotEmpty) {
+      // Send breaking news notification for the first new article
+      await _backgroundService.sendBreakingNewsNotification(newArticles.first);
+
+      // If there are multiple new articles, send a trending notification
+      if (newArticles.length > 1) {
+        await _backgroundService.sendTrendingNotification();
+      }
+    }
   }
 
   // Change category
@@ -132,7 +182,10 @@ class ArticleProvider with ChangeNotifier {
   }
 
   // Search articles
-  Future<void> searchArticles(String query, {required Map<String, dynamic> dateFilter, required String sortBy}) async {
+  Future<void> searchArticles(String query,
+      {required Map<String, dynamic> dateFilter,
+      required String sortBy,
+      String? language}) async {
     if (query.isEmpty) {
       _searchQuery = '';
       _searchResults = [];
@@ -151,8 +204,18 @@ class ArticleProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      _searchResults = await _repository.searchArticles(query: query);
+      _searchResults = await _repository.searchArticles(
+        query: query,
+        language: language,
+        sortBy: sortBy,
+      );
       _searchStatus = ArticleLoadingStatus.loaded;
+
+      // Send recommendation notification for search results
+      if (_searchResults.isNotEmpty) {
+        await _backgroundService
+            .sendRecommendationNotification(_searchResults.first);
+      }
     } catch (e) {
       _searchStatus = ArticleLoadingStatus.error;
       _errorMessage =
@@ -172,7 +235,12 @@ class ArticleProvider with ChangeNotifier {
 
   // Clear cache
   Future<void> clearCache() async {
-    await _repository.clearCache();
+    try {
+      await _repository.clearCache();
+    } catch (e) {
+      _errorMessage = 'Failed to clear cache';
+    }
+    notifyListeners();
   }
 
   @override

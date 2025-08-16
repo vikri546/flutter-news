@@ -9,15 +9,9 @@ import '../providers/article_provider.dart';
 
 enum DateFilter {
   all,
-  lastHour,
-  last2Hours,
-  last3Hours,
-  last6Hours,
-  last12Hours,
-  last24Hours,
+  yesterday,
   lastWeek,
   lastMonth,
-  custom
 }
 
 enum SortOrder {
@@ -44,7 +38,6 @@ class _SearchScreenState extends State<SearchScreen> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
   
-  // List of search recommendations
   final List<String> _searchRecommendations = [
     'Technology',
     'Business',
@@ -56,18 +49,11 @@ class _SearchScreenState extends State<SearchScreen> {
     'World News',
   ];
   
-  // List to store search history
   List<String> _searchHistory = [];
-  
-  // Track if user has started typing
   bool _isTyping = false;
   
-  // Filter and sort options
   DateFilter _selectedDateFilter = DateFilter.all;
   SortOrder _selectedSortOrder = SortOrder.newest;
-  DateTime? _customFromDate;
-  DateTime? _customToDate;
-  bool _showFilters = false;
   
   @override
   void initState() {
@@ -77,7 +63,6 @@ class _SearchScreenState extends State<SearchScreen> {
     _loadSearchHistory();
   }
   
-  // Load search history from SharedPreferences
   Future<void> _loadSearchHistory() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
@@ -85,22 +70,17 @@ class _SearchScreenState extends State<SearchScreen> {
     });
   }
   
-  // Save search history to SharedPreferences
   Future<void> _saveSearchHistory() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList('search_history', _searchHistory);
   }
   
-  // Add a search term to history
   void _addToSearchHistory(String query) {
     if (query.trim().isEmpty) return;
     
     setState(() {
-      // Remove the query if it already exists to avoid duplicates
       _searchHistory.remove(query);
-      // Add the query to the beginning of the list
       _searchHistory.insert(0, query);
-      // Limit history to 10 items
       if (_searchHistory.length > 10) {
         _searchHistory = _searchHistory.sublist(0, 10);
       }
@@ -109,7 +89,6 @@ class _SearchScreenState extends State<SearchScreen> {
     _saveSearchHistory();
   }
   
-  // Clear search history
   void _clearSearchHistory() async {
     setState(() {
       _searchHistory.clear();
@@ -139,7 +118,6 @@ class _SearchScreenState extends State<SearchScreen> {
         dateFilter: _getDateFilterParams(),
         sortBy: _getSortOrderParams(),
       );
-      // Hide keyboard after search
       FocusScope.of(context).unfocus();
     }
   }
@@ -147,36 +125,16 @@ class _SearchScreenState extends State<SearchScreen> {
   Map<String, dynamic> _getDateFilterParams() {
     final now = DateTime.now();
     DateTime? fromDate;
-    DateTime? toDate;
     
     switch (_selectedDateFilter) {
-      case DateFilter.lastHour:
-        fromDate = now.subtract(const Duration(hours: 1));
-        break;
-      case DateFilter.last2Hours:
-        fromDate = now.subtract(const Duration(hours: 2));
-        break;
-      case DateFilter.last3Hours:
-        fromDate = now.subtract(const Duration(hours: 3));
-        break;
-      case DateFilter.last6Hours:
-        fromDate = now.subtract(const Duration(hours: 6));
-        break;
-      case DateFilter.last12Hours:
-        fromDate = now.subtract(const Duration(hours: 12));
-        break;
-      case DateFilter.last24Hours:
-        fromDate = now.subtract(const Duration(days: 1));
+      case DateFilter.yesterday:
+        fromDate = DateTime(now.year, now.month, now.day - 1);
         break;
       case DateFilter.lastWeek:
         fromDate = now.subtract(const Duration(days: 7));
         break;
       case DateFilter.lastMonth:
         fromDate = now.subtract(const Duration(days: 30));
-        break;
-      case DateFilter.custom:
-        fromDate = _customFromDate;
-        toDate = _customToDate;
         break;
       case DateFilter.all:
       default:
@@ -185,7 +143,7 @@ class _SearchScreenState extends State<SearchScreen> {
     
     return {
       'from': fromDate?.toIso8601String(),
-      'to': toDate?.toIso8601String(),
+      'to': null,
     };
   }
   
@@ -204,169 +162,155 @@ class _SearchScreenState extends State<SearchScreen> {
     _searchController.text = recommendation;
     _performSearch(recommendation);
   }
-  
-  String _getDateFilterLabel(DateFilter filter) {
+
+  String _getDateFilterDropdownLabel(DateFilter filter) {
     switch (filter) {
-      case DateFilter.all:
-        return 'All Time';
-      case DateFilter.lastHour:
-        return 'Last Hour';
-      case DateFilter.last2Hours:
-        return 'Last 2 Hours';
-      case DateFilter.last3Hours:
-        return 'Last 3 Hours';
-      case DateFilter.last6Hours:
-        return 'Last 6 Hours';
-      case DateFilter.last12Hours:
-        return 'Last 12 Hours';
-      case DateFilter.last24Hours:
-        return 'Last 24 Hours';
+      case DateFilter.yesterday:
+        return 'Yesterday';
       case DateFilter.lastWeek:
         return 'Last Week';
       case DateFilter.lastMonth:
         return 'Last Month';
-      case DateFilter.custom:
-        return 'Custom Range';
+      case DateFilter.all:
+      default:
+        return 'Date';
     }
   }
-  
-  String _getSortOrderLabel(SortOrder order) {
+
+  String _getSortOrderDropdownLabel(SortOrder order) {
     switch (order) {
       case SortOrder.newest:
-        return 'Newest First';
+        return 'Newest';
       case SortOrder.oldest:
-        return 'Oldest First';
+        return 'Oldest';
       case SortOrder.relevance:
-        return 'Most Relevant';
+        return 'Relevance';
     }
   }
   
-  Future<void> _selectCustomDateRange() async {
-    final DateTimeRange? picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now(),
-      initialDateRange: _customFromDate != null && _customToDate != null
-          ? DateTimeRange(start: _customFromDate!, end: _customToDate!)
-          : null,
-    );
-    
-    if (picked != null) {
-      setState(() {
-        _customFromDate = picked.start;
-        _customToDate = picked.end;
-        _selectedDateFilter = DateFilter.custom;
-      });
-      
-      if (_searchController.text.isNotEmpty) {
-        _performSearch(_searchController.text);
-      }
-    }
-  }
-  
-  Widget _buildFilterChips() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Text(
-                'Filters',
-                style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
+  Widget _buildFilterButtons() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final buttonColor = isDark ? Colors.grey[800] : Colors.grey[200];
+    final selectedButtonColor = Theme.of(context).colorScheme.primary;
+    final onSelectedColor = Theme.of(context).colorScheme.onPrimary;
+
+    Widget buildDropdownButtonChild(String label, bool isSelected) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? selectedButtonColor : buttonColor,
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? onSelectedColor : Theme.of(context).textTheme.bodyLarge?.color,
+                fontWeight: FontWeight.w500,
               ),
-              const Spacer(),
-              IconButton(
-                icon: Icon(_showFilters ? Icons.expand_less : Icons.expand_more),
-                onPressed: () {
-                  setState(() {
-                    _showFilters = !_showFilters;
-                  });
-                },
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.arrow_drop_down,
+              size: 20,
+              color: isSelected ? onSelectedColor : Theme.of(context).iconTheme.color,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+      child: Row(
+        children: [
+          Text(
+            'Filter :',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const Spacer(),
+
+          ActionChip(
+            label: const Text('All Time'),
+            onPressed: () {
+              setState(() {
+                _selectedDateFilter = DateFilter.all;
+              });
+              if (_searchController.text.isNotEmpty) {
+                _performSearch(_searchController.text);
+              }
+            },
+            backgroundColor: _selectedDateFilter == DateFilter.all ? selectedButtonColor : buttonColor,
+            labelStyle: TextStyle(
+              color: _selectedDateFilter == DateFilter.all ? onSelectedColor : Theme.of(context).textTheme.bodyLarge?.color,
+              fontWeight: FontWeight.w500,
+            ),
+            side: BorderSide.none,
+          ),
+          const SizedBox(width: 8),
+
+          PopupMenuButton<DateFilter>(
+            onSelected: (DateFilter result) {
+              setState(() {
+                _selectedDateFilter = result;
+              });
+              if (_searchController.text.isNotEmpty) {
+                _performSearch(_searchController.text);
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<DateFilter>>[
+              const PopupMenuItem<DateFilter>(
+                value: DateFilter.yesterday,
+                child: Text('Yesterday'),
+              ),
+              const PopupMenuItem<DateFilter>(
+                value: DateFilter.lastWeek,
+                child: Text('Last Week'),
+              ),
+              const PopupMenuItem<DateFilter>(
+                value: DateFilter.lastMonth,
+                child: Text('Last Month'),
               ),
             ],
+            child: buildDropdownButtonChild(
+              _getDateFilterDropdownLabel(_selectedDateFilter),
+              _selectedDateFilter != DateFilter.all,
+            ),
           ),
-          if (_showFilters) ...[
-            const SizedBox(height: 8),
-            // Date Filter
-            Text(
-              'Date Range',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w600,
+          const SizedBox(width: 8),
+          
+          PopupMenuButton<SortOrder>(
+            onSelected: (SortOrder result) {
+              setState(() {
+                _selectedSortOrder = result;
+              });
+              if (_searchController.text.isNotEmpty) {
+                _performSearch(_searchController.text);
+              }
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<SortOrder>>[
+              const PopupMenuItem<SortOrder>(
+                value: SortOrder.newest,
+                child: Text('Newest First'),
               ),
-            ),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 8.0,
-              runSpacing: 4.0,
-              children: DateFilter.values.map((filter) {
-                return FilterChip(
-                  label: Text(_getDateFilterLabel(filter)),
-                  selected: _selectedDateFilter == filter,
-                  onSelected: (selected) {
-                    if (filter == DateFilter.custom) {
-                      _selectCustomDateRange();
-                    } else {
-                      setState(() {
-                        _selectedDateFilter = filter;
-                      });
-                      if (_searchController.text.isNotEmpty) {
-                        _performSearch(_searchController.text);
-                      }
-                    }
-                  },
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 12),
-            // Sort Order
-            Text(
-              'Sort By',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                fontWeight: FontWeight.w600,
+              const PopupMenuItem<SortOrder>(
+                value: SortOrder.oldest,
+                child: Text('Oldest First'),
               ),
-            ),
-            const SizedBox(height: 4),
-            Wrap(
-              spacing: 8.0,
-              runSpacing: 4.0,
-              children: SortOrder.values.map((order) {
-                return FilterChip(
-                  label: Text(_getSortOrderLabel(order)),
-                  selected: _selectedSortOrder == order,
-                  onSelected: (selected) {
-                    setState(() {
-                      _selectedSortOrder = order;
-                    });
-                    if (_searchController.text.isNotEmpty) {
-                      _performSearch(_searchController.text);
-                    }
-                  },
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 8),
-            // Clear Filters Button
-            if (_selectedDateFilter != DateFilter.all || _selectedSortOrder != SortOrder.newest)
-              TextButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _selectedDateFilter = DateFilter.all;
-                    _selectedSortOrder = SortOrder.newest;
-                    _customFromDate = null;
-                    _customToDate = null;
-                  });
-                  if (_searchController.text.isNotEmpty) {
-                    _performSearch(_searchController.text);
-                  }
-                },
-                icon: const Icon(Icons.clear),
-                label: const Text('Clear Filters'),
+              const PopupMenuItem<SortOrder>(
+                value: SortOrder.relevance,
+                child: Text('Most Relevant'),
               ),
-          ],
+            ],
+            child: buildDropdownButtonChild(
+              _getSortOrderDropdownLabel(_selectedSortOrder),
+              false,
+            ),
+          ),
         ],
       ),
     );
@@ -375,29 +319,13 @@ class _SearchScreenState extends State<SearchScreen> {
   List<Article> _filterAndSortArticles(List<Article> articles) {
     List<Article> filteredArticles = List.from(articles);
     
-    // Apply date filter
     if (_selectedDateFilter != DateFilter.all) {
       final now = DateTime.now();
       DateTime? cutoffDate;
       
       switch (_selectedDateFilter) {
-        case DateFilter.lastHour:
-          cutoffDate = now.subtract(const Duration(hours: 1));
-          break;
-        case DateFilter.last2Hours:
-          cutoffDate = now.subtract(const Duration(hours: 2));
-          break;
-        case DateFilter.last3Hours:
-          cutoffDate = now.subtract(const Duration(hours: 3));
-          break;
-        case DateFilter.last6Hours:
-          cutoffDate = now.subtract(const Duration(hours: 6));
-          break;
-        case DateFilter.last12Hours:
-          cutoffDate = now.subtract(const Duration(hours: 12));
-          break;
-        case DateFilter.last24Hours:
-          cutoffDate = now.subtract(const Duration(days: 1));
+        case DateFilter.yesterday:
+          cutoffDate = DateTime(now.year, now.month, now.day - 1);
           break;
         case DateFilter.lastWeek:
           cutoffDate = now.subtract(const Duration(days: 7));
@@ -405,21 +333,11 @@ class _SearchScreenState extends State<SearchScreen> {
         case DateFilter.lastMonth:
           cutoffDate = now.subtract(const Duration(days: 30));
           break;
-        case DateFilter.custom:
-          if (_customFromDate != null && _customToDate != null) {
-            filteredArticles = filteredArticles.where((article) {
-              final publishedAt = article.publishedAt;
-              if (publishedAt == null) return false;
-              return publishedAt.isAfter(_customFromDate!) && 
-                     publishedAt.isBefore(_customToDate!.add(const Duration(days: 1)));
-            }).toList();
-          }
-          break;
         default:
           break;
       }
       
-      if (cutoffDate != null && _selectedDateFilter != DateFilter.custom) {
+      if (cutoffDate != null) {
         filteredArticles = filteredArticles.where((article) {
           final publishedAt = article.publishedAt;
           return publishedAt != null && publishedAt.isAfter(cutoffDate!);
@@ -427,7 +345,6 @@ class _SearchScreenState extends State<SearchScreen> {
       }
     }
     
-    // Apply sorting
     switch (_selectedSortOrder) {
       case SortOrder.newest:
         filteredArticles.sort((a, b) {
@@ -446,7 +363,6 @@ class _SearchScreenState extends State<SearchScreen> {
         });
         break;
       case SortOrder.relevance:
-        // Keep original order for relevance (as returned by API)
         break;
     }
     
@@ -466,7 +382,7 @@ class _SearchScreenState extends State<SearchScreen> {
             hintText: 'Search for news...',
             border: InputBorder.none,
             hintStyle: TextStyle(
-                            color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.6),
+              color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.6),
             ),
           ),
           style: Theme.of(context).textTheme.bodyLarge,
@@ -474,20 +390,14 @@ class _SearchScreenState extends State<SearchScreen> {
           onSubmitted: _performSearch,
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () => _performSearch(_searchController.text),
-          ),
-          IconButton(
-            icon: const Icon(Icons.clear),
-            onPressed: () {
-              _searchController.clear();
-              Provider.of<ArticleProvider>(context, listen: false).clearSearch();
-              setState(() {
-                _isTyping = false;
-              });
-            },
-          ),
+          if (_isTyping)
+            IconButton(
+              icon: const Icon(Icons.clear),
+              onPressed: () {
+                _searchController.clear();
+                Provider.of<ArticleProvider>(context, listen: false).clearSearch();
+              },
+            ),
         ],
       ),
       body: Consumer<ArticleProvider>(
@@ -495,12 +405,10 @@ class _SearchScreenState extends State<SearchScreen> {
           final status = articleProvider.searchStatus;
           final results = articleProvider.searchResults;
           
-          // Show recommendations and history if we're in initial state and not typing
           if (status == ArticleLoadingStatus.initial && !_isTyping) {
             return ListView(
               padding: const EdgeInsets.symmetric(vertical: 8.0),
               children: [
-                // Search History Section
                 if (_searchHistory.isNotEmpty) ...[
                   Padding(
                     padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 8.0),
@@ -529,11 +437,6 @@ class _SearchScreenState extends State<SearchScreen> {
                       return ListTile(
                         leading: const Icon(Icons.history),
                         title: Text(_searchHistory[index]),
-                        trailing: IconButton(
-                          icon: const Icon(Icons.north_west),
-                          onPressed: () => _selectRecommendation(_searchHistory[index]),
-                          tooltip: 'Use this search',
-                        ),
                         onTap: () => _selectRecommendation(_searchHistory[index]),
                         contentPadding: EdgeInsets.zero,
                         dense: true,
@@ -543,7 +446,6 @@ class _SearchScreenState extends State<SearchScreen> {
                   const Divider(thickness: 1, height: 24),
                 ],
                 
-                // Recommended Searches Section
                 Padding(
                   padding: const EdgeInsets.fromLTRB(16.0, 8.0, 16.0, 8.0),
                   child: Text(
@@ -591,7 +493,7 @@ class _SearchScreenState extends State<SearchScreen> {
           } else if (status == ArticleLoadingStatus.loading) {
             return Column(
               children: [
-                _buildFilterChips(),
+                _buildFilterButtons(),
                 const Divider(height: 1),
                 Expanded(child: ShimmerLoading(isDark: isDark)),
               ],
@@ -599,7 +501,7 @@ class _SearchScreenState extends State<SearchScreen> {
           } else if (status == ArticleLoadingStatus.error) {
             return Column(
               children: [
-                _buildFilterChips(),
+                _buildFilterButtons(),
                 const Divider(height: 1),
                 Expanded(
                   child: ErrorView(
@@ -612,7 +514,7 @@ class _SearchScreenState extends State<SearchScreen> {
           } else if (results.isEmpty) {
             return Column(
               children: [
-                _buildFilterChips(),
+                _buildFilterButtons(),
                 const Divider(height: 1),
                 Expanded(
                   child: Center(
@@ -632,6 +534,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         const SizedBox(height: 8),
                         Text(
                           'Try adjusting your filters or search terms',
+                          textAlign: TextAlign.center,
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
                           ),
@@ -644,14 +547,12 @@ class _SearchScreenState extends State<SearchScreen> {
             );
           }
           
-          // Filter and sort the results
           final filteredResults = _filterAndSortArticles(results);
           
           return Column(
             children: [
-              _buildFilterChips(),
+              _buildFilterButtons(),
               const Divider(height: 1),
-              // Results count
               if (filteredResults.isNotEmpty)
                 Container(
                   width: double.infinity,
@@ -682,6 +583,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             const SizedBox(height: 8),
                             Text(
                               'Try adjusting your date range or sort options',
+                              textAlign: TextAlign.center,
                               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                 color: Theme.of(context).textTheme.bodyMedium?.color?.withOpacity(0.7),
                               ),
@@ -694,7 +596,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         itemCount: filteredResults.length,
                         itemBuilder: (context, index) {
                           final article = filteredResults[index];
-                          final isBookmarked = widget.bookmarkedArticles.contains(article);
+                          final isBookmarked = widget.bookmarkedArticles.any((a) => a.url == article.url);
                           
                           return ArticleCard(
                             article: article,

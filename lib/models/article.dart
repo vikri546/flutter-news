@@ -25,9 +25,7 @@ class Article {
 
   factory Article.fromJson(Map<String, dynamic> json) {
     return Article(
-      id: json['id'] ??
-          json[
-              'https://newsapi.org/v2'], // Use URL as ID if no ID is provided
+      id: json['id'] ?? json['url'],
       source: Source.fromJson(json['source']),
       author: json['author'],
       title: json['title'] ?? 'No Title',
@@ -61,10 +59,12 @@ class Article {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is Article && runtimeType == other.runtimeType && id == other.id;
+      other is Article &&
+          runtimeType == other.runtimeType &&
+          (id ?? url) == (other.id ?? other.url);
 
   @override
-  int get hashCode => id.hashCode;
+  int get hashCode => (id ?? url).hashCode;
 }
 
 class Source {

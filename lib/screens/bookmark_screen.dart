@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../models/article.dart';
 import '../widgets/article_card.dart';
 import '../widgets/theme_toggle_button.dart';
+import '../providers/language_provider.dart';
+import 'package:provider/provider.dart';
+import '../utils/strings.dart';
 
 class BookmarkScreen extends StatefulWidget {
   final List<Article> bookmarkedArticles;
@@ -112,6 +115,8 @@ class _BookmarkScreenState extends State<BookmarkScreen>
 
   @override
   Widget build(BuildContext context) {
+    final strings =
+        AppStrings(context.watch<LanguageProvider>().locale.languageCode);
     return WillPopScope(
       onWillPop: () async {
         // Automatically navigate to home screen
@@ -120,9 +125,9 @@ class _BookmarkScreenState extends State<BookmarkScreen>
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text(
-            'Bookmarks',
-            style: TextStyle(
+          title: Text(
+            strings.bookmarksTitle,
+            style: const TextStyle(
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -157,7 +162,7 @@ class _BookmarkScreenState extends State<BookmarkScreen>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No bookmarks yet',
+                        strings.noBookmarksYet,
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
@@ -168,7 +173,7 @@ class _BookmarkScreenState extends State<BookmarkScreen>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'Save articles to read them later',
+                        strings.saveUpTo5,
                         style: TextStyle(
                           fontSize: 14,
                           color: Theme.of(context).brightness == Brightness.dark
@@ -176,13 +181,52 @@ class _BookmarkScreenState extends State<BookmarkScreen>
                               : Colors.grey[600],
                         ),
                       ),
-                      Text(
-                        'You can only bookmark one article at a time',
-                        style: TextStyle(
-                          fontSize: 14,
+                      const SizedBox(height: 24),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        margin: const EdgeInsets.symmetric(horizontal: 20),
+                        decoration: BoxDecoration(
                           color: Theme.of(context).brightness == Brightness.dark
-                              ? Colors.grey[400]
-                              : Colors.grey[600],
+                              ? Colors.grey[800]
+                              : Colors.grey[100],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color:
+                                Theme.of(context).brightness == Brightness.dark
+                                    ? Colors.grey.shade700
+                                    : Colors.grey.shade300,
+                          ),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.format_quote,
+                              size: 24,
+                              color: Theme.of(context).brightness ==
+                                      Brightness.dark
+                                  ? Colors.yellow[600]
+                                  : Colors.yellow[400],
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              context
+                                          .watch<LanguageProvider>()
+                                          .locale
+                                          .languageCode ==
+                                      'id'
+                                  ? '"Membaca berita adalah cara terbaik untuk memahami dunia di sekitar kita dan tetap terhubung dengan realitas yang terus berubah."'
+                                  : '"Reading news is the best way to understand the world around us and stay connected with the ever-changing reality."',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontStyle: FontStyle.italic,
+                                color: Theme.of(context).brightness ==
+                                        Brightness.dark
+                                    ? Colors.grey[300]
+                                    : Colors.grey[700],
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ],
@@ -208,7 +252,8 @@ class _BookmarkScreenState extends State<BookmarkScreen>
                       child: ArticleCard(
                         article: article,
                         isBookmarked: true,
-                        onBookmarkToggle: () => widget.onBookmarkToggle(article),
+                        onBookmarkToggle: () =>
+                            widget.onBookmarkToggle(article),
                         index: index,
                       ),
                     ),

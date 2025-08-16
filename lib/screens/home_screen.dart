@@ -7,9 +7,12 @@ import '../widgets/shimmer_loading.dart';
 import '../widgets/theme_toggle_button.dart';
 import '../widgets/error_view.dart';
 import '../providers/article_provider.dart';
+import '../utils/strings.dart';
 import '../utils/auth_service.dart';
 import 'search_screen.dart';
 import 'login_screen.dart';
+import '../providers/language_provider.dart';
+import 'notifications_screen.dart';
 
 // List of available categories
 const List<String> categories = [
@@ -90,20 +93,22 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   Future<void> _logout() async {
+    final strings =
+        AppStrings(context.read<LanguageProvider>().locale.languageCode);
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (BuildContext context) {
         return AlertDialog(
-          title: const Text('Logout'),
-          content: const Text('Are you sure you want to logout?'),
+          title: Text(strings.logoutConfirmTitle),
+          content: Text(strings.logoutConfirmMessage),
           actions: <Widget>[
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
+              child: Text(strings.cancel),
             ),
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Logout'),
+              child: Text(strings.logout),
             ),
           ],
         );
@@ -113,7 +118,7 @@ class _HomeScreenState extends State<HomeScreen>
     if (shouldLogout == true) {
       final authService = AuthService();
       await authService.logout();
-      
+
       if (mounted) {
         Navigator.pushAndRemoveUntil(
           context,
@@ -245,8 +250,9 @@ class _HomeScreenState extends State<HomeScreen>
               child: IconButton(
                 icon: const Icon(Icons.notifications_none),
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('This feature upcoming')),
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                        builder: (_) => const NotificationsScreen()),
                   );
                 },
               ),
@@ -282,13 +288,21 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                       const SizedBox(height: 8),
                       if (_currentUsername.isNotEmpty)
-                        Text(
-                          'Welcome, $_currentUsername',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: isDark ? Colors.white70 : Colors.black87,
-                          ),
+                        Builder(
+                          builder: (context) {
+                            final strings = AppStrings(context
+                                .watch<LanguageProvider>()
+                                .locale
+                                .languageCode);
+                            return Text(
+                              '${strings.welcome}, $_currentUsername',
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w500,
+                                color: isDark ? Colors.white70 : Colors.black87,
+                              ),
+                            );
+                          },
                         ),
                     ],
                   ),
@@ -331,9 +345,52 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
                 const Divider(),
+                Builder(
+                  builder: (context) {
+                    final lang = context
+                        .watch<LanguageProvider>()
+                        .locale
+                        .languageCode
+                        .toUpperCase();
+                    final strings = AppStrings(
+                        context.watch<LanguageProvider>().locale.languageCode);
+                    return ListTile(
+                      leading: CircleAvatar(
+                        radius: 12,
+                        child: Text(
+                          lang,
+                          style: const TextStyle(
+                              fontSize: 10, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      title: Text(strings.language),
+                      subtitle: Text(
+                          lang == 'EN' ? strings.english : strings.indonesian),
+                      onTap: () async {
+                        await context.read<LanguageProvider>().toggleLocale();
+                        final newLang = context
+                            .read<LanguageProvider>()
+                            .locale
+                            .languageCode;
+                        await context
+                            .read<ArticleProvider>()
+                            .setCountryCode(newLang == 'id' ? 'id' : 'us');
+                        if (mounted) Navigator.pop(context);
+                      },
+                    );
+                  },
+                ),
                 ListTile(
                   leading: const Icon(Icons.logout),
-                  title: const Text('Logout'),
+                  title: Builder(
+                    builder: (context) {
+                      final strings = AppStrings(context
+                          .watch<LanguageProvider>()
+                          .locale
+                          .languageCode);
+                      return Text(strings.logout);
+                    },
+                  ),
                   onTap: _logout,
                 ),
                 const SizedBox(height: 16),

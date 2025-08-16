@@ -1,0 +1,2 @@
+C:/Users/PF3WF/Documents/dtalk_app/android/app/.cxx/Debug/aa3u3aq2/x86_64/CMakeFiles/edit_cache.dir
+C:/Users/PF3WF/Documents/dtalk_app/android/app/.cxx/Debug/aa3u3aq2/x86_64/CMakeFiles/rebuild_cache.dir

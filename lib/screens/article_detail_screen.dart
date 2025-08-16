@@ -535,38 +535,68 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen>
 
                     // Platform-specific Read Full Article Button
                     Center(
-                      child: Container(
+                      child: SizedBox(
                         width: double.infinity,
                         height: 56,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: Colors.lightBlue,
-                            width: 2,
-                          ),
-                          color: Colors.transparent,
-                        ),
                         child: ElevatedButton.icon(
                           onPressed: _openArticleUrl,
                           icon: Icon(
                             _getPlatformIcon(),
-                            color: Colors.lightBlue,
-                            size: 24,
+                            size: 22,
+                            color: Theme.of(context).brightness == Brightness.dark 
+                                ? Colors.white 
+                                : Colors.black,
                           ),
                           label: Text(
                             _getPlatformButtonText(),
                             style: TextStyle(
-                              color: Colors.lightBlue,
-                              fontSize: 18,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
+                              color: Theme.of(context).brightness == Brightness.dark 
+                                  ? Colors.white 
+                                  : Colors.black,
                             ),
                           ),
                           style: ElevatedButton.styleFrom(
+                            foregroundColor: Theme.of(context).brightness == Brightness.dark 
+                                ? Colors.white 
+                                : Colors.black,
                             backgroundColor: Colors.transparent,
                             shadowColor: Colors.transparent,
-                            elevation: 0,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
+                            ),
+                          ).merge(
+                            ButtonStyle(
+                              padding: WidgetStateProperty.all(
+                                  const EdgeInsets.symmetric(horizontal: 16)),
+                              elevation: WidgetStateProperty.all(0),
+                              overlayColor: WidgetStateProperty.all(
+                                  Theme.of(context).brightness == Brightness.dark 
+                                      ? Colors.white.withOpacity(0.08)
+                                      : Colors.black.withOpacity(0.08)),
+                              backgroundColor: WidgetStateProperty.resolveWith(
+                                  (states) => Colors.transparent),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    // Subtle gradient behind the button
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        ignoring: true,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(16),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.lightBlue.withOpacity(0.25),
+                                Colors.blueAccent.withOpacity(0.15),
+                              ],
                             ),
                           ),
                         ),
@@ -613,33 +643,6 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen>
             ),
           ),
         ],
-      ),
-      floatingActionButton: AnimatedBuilder(
-        animation: _animationController,
-        builder: (context, child) {
-          return ScaleTransition(
-            scale: CurvedAnimation(
-              parent: _animationController,
-              curve: const Interval(0.6, 1.0, curve: Curves.elasticOut),
-            ),
-            child: FloatingActionButton.extended(
-              onPressed: () async {
-                try {
-                  await Share.share(
-                    '${widget.article.title}\n\n${widget.article.url}',
-                    subject: widget.article.title,
-                  );
-                } catch (e) {
-                  _showErrorSnackBar(
-                      'Failed to share article: ${e.toString()}');
-                }
-              },
-              icon: const Icon(Icons.share),
-              label: const Text('Share'),
-              tooltip: 'Share Article',
-            ),
-          );
-        },
       ),
     );
   }
