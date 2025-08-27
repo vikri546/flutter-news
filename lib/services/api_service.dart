@@ -13,7 +13,7 @@ class ApiService {
     String country = 'us',
     String? category,
     int page = 1,
-    int pageSize = 20,
+    int pageSize = 100,
   }) async {
     return _invokeFunction(
       'top-headlines',
@@ -31,7 +31,7 @@ class ApiService {
     String? sortBy,
     String? language,
     int page = 1,
-    int pageSize = 20,
+    int pageSize = 100,
   }) async {
     return _invokeFunction(
       'everything',
@@ -46,7 +46,7 @@ class ApiService {
   }
 
   Future<List<Article>> getArticlesByCategory(String category,
-      {int page = 1, int pageSize = 20}) async {
+      {int page = 1, int pageSize = 100}) async {
     if (category == 'All') {
       return getTopHeadlines(page: page, pageSize: pageSize);
     }

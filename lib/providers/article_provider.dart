@@ -111,7 +111,7 @@ class ArticleProvider with ChangeNotifier {
       }
 
       // Check if we've reached the end of the data
-      if (newArticles.isEmpty || newArticles.length < 20) {
+      if (newArticles.isEmpty || newArticles.length < 100) {
         _hasMorePages = false;
         _status = ArticleLoadingStatus.noMoreData;
       } else {

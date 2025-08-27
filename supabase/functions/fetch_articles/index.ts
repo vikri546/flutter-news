@@ -12,7 +12,7 @@ serve(async (req) => {
   const category = searchParams.get('category')
   const q = searchParams.get('q')
   const page = searchParams.get('page') || '1'
-  const pageSize = searchParams.get('pageSize') || '20'
+  const pageSize = searchParams.get('pageSize') || '100'
 
   let apiUrl = `${NEWS_API_URL}/${endpoint}?apiKey=${NEWS_API_KEY}&country=${country}&page=${page}&pageSize=${pageSize}`
 
