@@ -8,11 +8,11 @@ import '../widgets/theme_toggle_button.dart';
 import '../widgets/error_view.dart';
 import '../providers/article_provider.dart';
 import '../utils/strings.dart';
-import '../utils/auth_service.dart';
 import 'search_screen.dart';
 import 'login_screen.dart';
 import '../providers/language_provider.dart';
 import 'notifications_screen.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
 // List of available categories
 const List<String> categories = [
@@ -23,117 +23,44 @@ const List<String> categories = [
   'POLITIK',
 ];
 
-class HomeScreen extends StatefulWidget {
-  final List<Article> bookmarkedArticles;
-  final Function(Article) onBookmarkToggle;
-
-  const HomeScreen({
-    Key? key,
-    required this.bookmarkedArticles,
-    required this.onBookmarkToggle,
-  }) : super(key: key);
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({Key? key}) : super(key: key);
 
   @override
-  State<HomeScreen> createState() => _HomeScreenState();
+  Widget build(BuildContext context) {
+    return ChangeNotifierProvider(
+      create: (_) => HomeScreenProvider()..loadCurrentUser(),
+      child: const HomeScreenContent(),
+    );
+  }
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with AutomaticKeepAliveClientMixin, SingleTickerProviderStateMixin {
-  final ScrollController _scrollController = ScrollController();
-  late AnimationController _animationController;
-  late Animation<double> _animation;
-  String? _previousCategory;
-  bool _showCategoryNotification = false;
-  String _currentUsername = '';
+class HomeScreenContent extends StatefulWidget {
+  const HomeScreenContent({Key? key}) : super(key: key);
 
   @override
-  bool get wantKeepAlive => true;
+  _HomeScreenContentState createState() => _HomeScreenContentState();
+}
+
+class _HomeScreenContentState extends State<HomeScreenContent>
+    with SingleTickerProviderStateMixin {
+  final ScrollController _scrollController = ScrollController();
+  late Animation<double> _animation;
 
   @override
   void initState() {
     super.initState();
+    final provider = Provider.of<HomeScreenProvider>(context, listen: false);
+    provider.initAnimationController(this);
     _scrollController.addListener(_onScroll);
-    _loadCurrentUser();
-
-    // Initialize animation controller
-    _animationController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-
-    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(parent: _animationController, curve: Curves.easeInOut));
-
-    // Add listener to hide notification after animation completes
-    _animationController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            _animationController.reverse().then((_) {
-              if (mounted) {
-                setState(() {
-                  _showCategoryNotification = false;
-                });
-              }
-            });
-          }
-        });
-      }
-    });
-  }
-
-  Future<void> _loadCurrentUser() async {
-    final authService = AuthService();
-    final user = await authService.getCurrentUser();
-    if (user != null && mounted) {
-      setState(() {
-        _currentUsername = user['username'] ?? '';
-      });
-    }
-  }
-
-  Future<void> _logout() async {
-    final strings =
-        AppStrings(context.read<LanguageProvider>().locale.languageCode);
-    final shouldLogout = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(strings.logoutConfirmTitle),
-          content: Text(strings.logoutConfirmMessage),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: Text(strings.cancel),
-            ),
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              child: Text(strings.logout),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (shouldLogout == true) {
-      final authService = AuthService();
-      await authService.logout();
-
-      if (mounted) {
-        Navigator.pushAndRemoveUntil(
-          context,
-          MaterialPageRoute(builder: (context) => const LoginScreen()),
-          (route) => false,
-        );
-      }
-    }
+    _animation = Tween<double>(begin: 0.0, end: 1.0).animate(CurvedAnimation(
+        parent: provider.animationController, curve: Curves.easeInOut));
   }
 
   @override
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
-    _animationController.dispose();
     super.dispose();
   }
 
@@ -146,70 +73,26 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  void _showCategoryIndicator(String category) {
-    if (_previousCategory != category) {
-      _previousCategory = category;
-      setState(() {
-        _showCategoryNotification = true;
-      });
-      _animationController.forward(from: 0.0);
-    }
-  }
-
-  // Show exit confirmation dialog
-  Future<bool> _showExitConfirmationDialog() async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (BuildContext context) {
-            return AlertDialog(
-              title: const Text('Exit App'),
-              content: const Text('Are you sure you want to exit the app?'),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Cancel'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(true),
-                  child: const Text('Exit'),
-                ),
-              ],
-            );
-          },
-        ) ??
-        false; // Default to false if dialog is dismissed
-  }
-
-  // Open URL function (placeholder)
-  void _launchURL(String url) {
-    // In a real app, you would use url_launcher package
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Opening $url')),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
-    super.build(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final articleProvider = Provider.of<ArticleProvider>(context);
+    final homeScreenProvider = Provider.of<HomeScreenProvider>(context);
 
-    // Check if category changed and show notification
-    if (articleProvider.currentCategory != _previousCategory) {
+    if (articleProvider.currentCategory != homeScreenProvider.previousCategory) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showCategoryIndicator(articleProvider.currentCategory);
+        homeScreenProvider.showCategoryIndicator(articleProvider.currentCategory);
       });
     }
 
     return WillPopScope(
       onWillPop: () async {
-        // Show confirmation dialog when back button is pressed
-        final shouldExit = await _showExitConfirmationDialog();
+        final shouldExit =
+            await homeScreenProvider.showExitConfirmationDialog(context);
         if (shouldExit) {
-          // Exit the app
           SystemNavigator.pop();
         }
-        return false; // Prevent default back button behavior
+        return false;
       },
       child: Scaffold(
         appBar: AppBar(
@@ -217,10 +100,10 @@ class _HomeScreenState extends State<HomeScreen>
             isDark
                 ? 'assets/images/logo_dark.png'
                 : 'assets/images/logo_light.png',
-            height: 32, // Adjust height as needed
+            height: 32,
             fit: BoxFit.contain,
           ),
-          centerTitle: false, // Keep logo aligned to left like the text was
+          centerTitle: false,
           leading: Builder(
             builder: (context) => IconButton(
               icon: const Icon(Icons.menu),
@@ -236,36 +119,28 @@ class _HomeScreenState extends State<HomeScreen>
                 Navigator.push(
                   context,
                   MaterialPageRoute(
-                    builder: (context) => SearchScreen(
-                      bookmarkedArticles: widget.bookmarkedArticles,
-                      onBookmarkToggle: widget.onBookmarkToggle,
-                    ),
+                    builder: (context) => SearchScreen(),
                   ),
                 );
               },
             ),
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              curve: Curves.easeInOut,
-              child: IconButton(
-                icon: const Icon(Icons.notifications_none),
-                onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                        builder: (_) => const NotificationsScreen()),
-                  );
-                },
-              ),
+            IconButton(
+              icon: const Icon(Icons.notifications_none),
+              onPressed: () {
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                      builder: (_) => const NotificationsScreen()),
+                );
+              },
             ),
             const ThemeToggleButton(),
           ],
         ),
         drawer: Theme(
           data: Theme.of(context).copyWith(
-            // Remove rounded corners from drawer
             drawerTheme: const DrawerThemeData(
               shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.zero, // Make drawer rectangular
+                borderRadius: BorderRadius.zero,
               ),
             ),
           ),
@@ -273,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen>
             child: Column(
               children: [
                 DrawerHeader(
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: Colors.transparent,
                   ),
                   child: Column(
@@ -287,7 +162,7 @@ class _HomeScreenState extends State<HomeScreen>
                         fit: BoxFit.contain,
                       ),
                       const SizedBox(height: 8),
-                      if (_currentUsername.isNotEmpty)
+                      if (homeScreenProvider.currentUsername.isNotEmpty)
                         Builder(
                           builder: (context) {
                             final strings = AppStrings(context
@@ -295,7 +170,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 .locale
                                 .languageCode);
                             return Text(
-                              '${strings.welcome}, $_currentUsername',
+                              '${strings.welcome}, ${homeScreenProvider.currentUsername}',
                               style: TextStyle(
                                 fontSize: 14,
                                 fontWeight: FontWeight.w500,
@@ -328,9 +203,8 @@ class _HomeScreenState extends State<HomeScreen>
                         selected: isSelected,
                         onTap: () {
                           articleProvider.changeCategory(category);
-                          Navigator.pop(context); // Close drawer
+                          Navigator.pop(context);
 
-                          // Scroll to top if needed
                           if (_scrollController.hasClients &&
                               _scrollController.offset > 0) {
                             _scrollController.animateTo(
@@ -391,7 +265,7 @@ class _HomeScreenState extends State<HomeScreen>
                       return Text(strings.logout);
                     },
                   ),
-                  onTap: _logout,
+                  onTap: () => homeScreenProvider.logout(context),
                 ),
                 const SizedBox(height: 16),
               ],
@@ -400,7 +274,6 @@ class _HomeScreenState extends State<HomeScreen>
         ),
         body: Stack(
           children: [
-            // Articles list
             Column(
               children: [
                 Expanded(
@@ -415,12 +288,13 @@ class _HomeScreenState extends State<HomeScreen>
                         final articles = articleProvider.articles;
                         final currentCategory = articleProvider.currentCategory;
 
-                        // Check if the current category is one of the specified categories
+                        final strings = AppStrings(
+                            context.watch<LanguageProvider>().locale.languageCode);
                         if (['DIGITAL', 'EKBIS', 'HUKUM', 'POLITIK']
                             .contains(currentCategory)) {
                           return Center(
                             child: Text(
-                              'Sorry this is empty, comeback later :)',
+                              strings.emptyCategory,
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w500,
@@ -441,8 +315,8 @@ class _HomeScreenState extends State<HomeScreen>
                             onRetry: () => articleProvider.refreshArticles(),
                           );
                         } else if (articles.isEmpty) {
-                          return const Center(
-                            child: Text('No articles found in this category'),
+                          return Center(
+                            child: Text(strings.noArticlesFound),
                           );
                         }
 
@@ -452,7 +326,6 @@ class _HomeScreenState extends State<HomeScreen>
                           itemCount: articles.length +
                               (articleProvider.hasMorePages ? 1 : 0),
                           itemBuilder: (context, index) {
-                            // Show loading indicator at the bottom while loading more
                             if (index == articles.length) {
                               return const Center(
                                 child: Padding(
@@ -463,16 +336,15 @@ class _HomeScreenState extends State<HomeScreen>
                             }
 
                             final article = articles[index];
-                            final isBookmarked =
-                                widget.bookmarkedArticles.contains(article);
+                            final isBookmarked = articleProvider
+                                .bookmarkedArticles
+                                .any((a) => a.id == article.id);
 
                             return ArticleCard(
                               article: article,
                               isBookmarked: isBookmarked,
                               onBookmarkToggle: () {
-                                widget.onBookmarkToggle(article);
-                                // Force rebuild to update bookmark icon
-                                setState(() {});
+                                articleProvider.toggleBookmark(article);
                               },
                               index: index,
                             );
@@ -484,9 +356,7 @@ class _HomeScreenState extends State<HomeScreen>
                 ),
               ],
             ),
-
-            // Category notification with fade animation
-            if (_showCategoryNotification)
+            if (homeScreenProvider.showCategoryNotification)
               Positioned(
                 bottom: 16,
                 left: 0,
@@ -509,7 +379,7 @@ class _HomeScreenState extends State<HomeScreen>
                         ],
                       ),
                       child: Text(
-                        _previousCategory ?? '',
+                        homeScreenProvider.previousCategory,
                         style: const TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,

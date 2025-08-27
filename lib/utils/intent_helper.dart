@@ -1,7 +1,10 @@
 import 'dart:io';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:android_intent_plus/flag.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../widgets/browser_chooser_dialog.dart';
 
 class IntentHelper {
   /// Launch URL with Android Intent Chooser
@@ -102,6 +105,28 @@ class IntentHelper {
       return await intent.canResolveActivity() ?? false;
     } catch (e) {
       return false;
+    }
+  }
+
+  static Future<void> openArticleUrl(BuildContext context, String url) async {
+    try {
+      if (kIsWeb) {
+        await launchUrl(Uri.parse(url), webOnlyWindowName: '_blank');
+      } else if (Platform.isAndroid) {
+        final success = await launchUrlWithChooser(url, title: 'Open with');
+        if (!success) {
+          await showDialog(
+            context: context,
+            builder: (context) => BrowserChooserDialog(url: url, title: 'Open with'),
+          );
+        }
+      } else {
+        await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error opening URL: $e')),
+      );
     }
   }
 }

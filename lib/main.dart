@@ -21,6 +21,7 @@ import 'services/location_service.dart';
 import 'services/background_notification_service.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/supabase_credentials.dart';
+import 'providers/home_screen_provider.dart';
 
 // PERUBAHAN: Fungsi main diubah menjadi async untuk inisialisasi service
 Future<void> main() async {
@@ -52,6 +53,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => ArticleProvider()),
         ChangeNotifierProvider(create: (_) => LanguageProvider()..loadLocale()),
+        ChangeNotifierProvider(create: (_) => HomeScreenProvider()),
       ],
       child: const MyApp(),
     ),

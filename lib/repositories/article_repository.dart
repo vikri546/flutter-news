@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/article.dart';
 import '../services/api_service.dart';
 import '../utils/app_exceptions.dart';
@@ -167,6 +168,49 @@ class ArticleRepository {
       await prefs.remove(_cacheTimestampKey);
     } catch (e) {
       throw CacheException('Failed to clear cache: ${e.toString()}');
+    }
+  }
+
+  // Bookmarks
+  Future<List<Article>> getBookmarks() async {
+    final response = await Supabase.instance.client
+        .from('bookmarks')
+        .select()
+        .order('created_at', ascending: false);
+    if (response.error != null) {
+      throw DatabaseException(response.error!.message);
+    }
+    return (response.data as List)
+        .map((e) => Article.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<Article> addBookmark(Article article) async {
+    final response = await Supabase.instance.client.from('bookmarks').insert({
+      'user_id': Supabase.instance.client.auth.currentUser!.id,
+      'article_source_id': article.source.id,
+      'article_source_name': article.source.name,
+      'author': article.author,
+      'title': article.title,
+      'description': article.description,
+      'url': article.url,
+      'url_to_image': article.urlToImage,
+      'published_at': article.publishedAt?.toIso8601String(),
+      'content': article.content,
+    }).select();
+    if (response.error != null) {
+      throw DatabaseException(response.error!.message);
+    }
+    return Article.fromJson(response.data[0]);
+  }
+
+  Future<void> removeBookmark(String articleId) async {
+    final response = await Supabase.instance.client
+        .from('bookmarks')
+        .delete()
+        .match({'id': articleId});
+    if (response.error != null) {
+      throw DatabaseException(response.error!.message);
     }
   }
 

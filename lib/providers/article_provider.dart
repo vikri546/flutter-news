@@ -39,9 +39,11 @@ class ArticleProvider with ChangeNotifier {
 
   // Previous articles for comparison
   List<Article> _previousArticles = [];
+  List<Article> _bookmarkedArticles = [];
 
   // Getters
   List<Article> get articles => _articles;
+  List<Article> get bookmarkedArticles => _bookmarkedArticles;
   String get currentCategory => _currentCategory;
   String get errorMessage => _errorMessage;
   ArticleLoadingStatus get status => _status;
@@ -244,6 +246,34 @@ class ArticleProvider with ChangeNotifier {
   }
 
   @override
+  // Bookmarks
+  Future<void> getBookmarks() async {
+    try {
+      final bookmarks = await _repository.getBookmarks();
+      _bookmarkedArticles = bookmarks;
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = 'Failed to get bookmarks';
+      notifyListeners();
+    }
+  }
+
+  Future<void> toggleBookmark(Article article) async {
+    try {
+      if (_bookmarkedArticles.any((a) => a.id == article.id)) {
+        await _repository.removeBookmark(article.id!);
+        _bookmarkedArticles.removeWhere((a) => a.id == article.id);
+      } else {
+        final newBookmark = await _repository.addBookmark(article);
+        _bookmarkedArticles.add(newBookmark);
+      }
+      notifyListeners();
+    } catch (e) {
+      _errorMessage = 'Failed to toggle bookmark';
+      notifyListeners();
+    }
+  }
+
   void dispose() {
     _repository.dispose();
     super.dispose();

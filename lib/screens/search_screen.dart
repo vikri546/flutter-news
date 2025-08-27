@@ -21,14 +21,7 @@ enum SortOrder {
 }
 
 class SearchScreen extends StatefulWidget {
-  final List<Article> bookmarkedArticles;
-  final Function(Article) onBookmarkToggle;
-
-  const SearchScreen({
-    Key? key,
-    required this.bookmarkedArticles,
-    required this.onBookmarkToggle,
-  }) : super(key: key);
+  const SearchScreen({Key? key}) : super(key: key);
 
   @override
   State<SearchScreen> createState() => _SearchScreenState();
@@ -596,12 +589,15 @@ class _SearchScreenState extends State<SearchScreen> {
                         itemCount: filteredResults.length,
                         itemBuilder: (context, index) {
                           final article = filteredResults[index];
-                          final isBookmarked = widget.bookmarkedArticles.any((a) => a.url == article.url);
-                          
+                          final isBookmarked = articleProvider.bookmarkedArticles
+                              .any((a) => a.id == article.id);
+
                           return ArticleCard(
                             article: article,
                             isBookmarked: isBookmarked,
-                            onBookmarkToggle: () => widget.onBookmarkToggle(article),
+                            onBookmarkToggle: () {
+                              articleProvider.toggleBookmark(article);
+                            },
                             index: index,
                           );
                         },

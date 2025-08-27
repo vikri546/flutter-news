@@ -31,4 +31,12 @@ class AppStrings {
   String get language => isEn ? 'Language' : 'Bahasa';
   String get english => 'EN';
   String get indonesian => 'ID';
+  String get exitApp => isEn ? 'Exit App' : 'Keluar Aplikasi';
+  String get exitAppConfirm =>
+      isEn ? 'Are you sure you want to exit the app?' : 'Apakah Anda yakin ingin keluar dari aplikasi?';
+  String get exit => isEn ? 'Exit' : 'Keluar';
+  String get emptyCategory =>
+      isEn ? 'Sorry this is empty, comeback later :)' : 'Maaf, kategori ini kosong, kembali lagi nanti :)';
+  String get noArticlesFound =>
+      isEn ? 'No articles found in this category' : 'Tidak ada artikel yang ditemukan di kategori ini';
 }
