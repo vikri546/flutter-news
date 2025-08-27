@@ -7,6 +7,9 @@ import '../models/article.dart';
 import '../widgets/browser_chooser_dialog.dart';
 import '../utils/intent_helper.dart';
 import 'dart:io';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../models/comment.dart';
+import '../widgets/comment_card.dart';
 
 class ArticleDetailScreen extends StatefulWidget {
   final Article article;
@@ -32,6 +35,8 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen>
   late AnimationController _animationController;
   late Animation<double> _fadeInAnimation;
   late Animation<Offset> _slideAnimation;
+  final _commentController = TextEditingController();
+  late final Stream<List<Comment>> _commentsStream;
 
   bool _showAppBarTitle = false;
 
@@ -60,6 +65,13 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen>
     ));
 
     _animationController.forward();
+
+    _commentsStream = Supabase.instance.client
+        .from('comments')
+        .stream(primaryKey: ['id'])
+        .eq('article_url', widget.article.url)
+        .order('created_at', ascending: false)
+        .map((maps) => maps.map((map) => Comment.fromJson(map)).toList());
   }
 
   @override
@@ -637,6 +649,74 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen>
                       ),
                     ),
                     const SizedBox(height: 32),
+                    const Divider(),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Comments',
+                      style: Theme.of(context).textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: 16),
+                    StreamBuilder<List<Comment>>(
+                      stream: _commentsStream,
+                      builder: (context, snapshot) {
+                        if (snapshot.connectionState ==
+                            ConnectionState.waiting) {
+                          return const Center(
+                              child: CircularProgressIndicator());
+                        }
+                        if (snapshot.hasError) {
+                          return Center(
+                              child: Text('Error: ${snapshot.error}'));
+                        }
+                        final comments = snapshot.data!;
+                        if (comments.isEmpty) {
+                          return const Center(
+                              child: Text('No comments yet.'));
+                        }
+                        return ListView.builder(
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          itemCount: comments.length,
+                          itemBuilder: (context, index) {
+                            final comment = comments[index];
+                            return CommentCard(comment: comment);
+                          },
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _commentController,
+                            decoration: const InputDecoration(
+                              hintText: 'Add a comment...',
+                              border: OutlineInputBorder(),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.send),
+                          onPressed: () async {
+                            final commentText = _commentController.text;
+                            if (commentText.isNotEmpty) {
+                              final userId = Supabase
+                                  .instance.client.auth.currentUser!.id;
+                              await Supabase.instance
+                                  .client
+                                  .from('comments')
+                                  .insert({
+                                'article_url': widget.article.url,
+                                'user_id': userId,
+                                'comment_text': commentText,
+                              });
+                              _commentController.clear();
+                            }
+                          },
+                        ),
+                      ],
+                    ),
                   ],
                 ),
               ),
