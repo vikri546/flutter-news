@@ -8,24 +8,30 @@ import 'screens/about_screen.dart';
 import 'models/article.dart';
 import 'utils/custom_page_transitions.dart';
 import 'utils/theme_config.dart';
-import 'utils/auth_service.dart';
 import 'providers/theme_provider.dart';
 import 'providers/article_provider.dart';
 import 'widgets/theme_transition_builder.dart';
 import 'utils/font_cache.dart';
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'providers/language_provider.dart';
 import 'utils/strings.dart';
 import 'services/notification_service.dart';
 import 'services/location_service.dart';
 import 'services/background_notification_service.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import 'services/supabase_credentials.dart';
 
 // PERUBAHAN: Fungsi main diubah menjadi async untuk inisialisasi service
 Future<void> main() async {
   // Memastikan semua binding Flutter siap sebelum menjalankan kode async
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Supabase
+  await Supabase.initialize(
+    url: supabaseUrl,
+    anonKey: supabaseAnonKey,
+  );
 
   // Mengunci orientasi layar ke potret
   SystemChrome.setPreferredOrientations([
@@ -78,8 +84,11 @@ class MyApp extends StatelessWidget {
                     TargetPlatform.iOS: CustomPageTransitionBuilder(),
                   },
                 ),
+                useMaterial3: true,
               ),
-              darkTheme: AppTheme.darkTheme,
+              darkTheme: AppTheme.darkTheme.copyWith(
+                useMaterial3: true,
+              ),
               themeMode: themeProvider.themeMode,
               locale: languageProvider.locale,
               supportedLocales: const [Locale('en'), Locale('id')],
@@ -105,38 +114,50 @@ class AuthWrapper extends StatefulWidget {
 }
 
 class _AuthWrapperState extends State<AuthWrapper> {
-  bool _isLoading = true;
-  bool _isLoggedIn = false;
-
   @override
   void initState() {
     super.initState();
-    _checkAuthStatus();
+    _redirectBasedOnAuthState();
   }
 
-  Future<void> _checkAuthStatus() async {
-    final authService = AuthService();
-    final isLoggedIn = await authService.isLoggedIn();
+  Future<void> _redirectBasedOnAuthState() async {
+    // Wait for the widget to be fully built before navigating
+    await Future.delayed(Duration.zero);
 
-    if (mounted) {
-      setState(() {
-        _isLoggedIn = isLoggedIn;
-        _isLoading = false;
-      });
+    final session = Supabase.instance.client.auth.currentSession;
+
+    if (!mounted) return;
+
+    if (session != null) {
+      // User is logged in, navigate to the main screen
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const MainScreen()),
+      );
+    } else {
+      // User is not logged in, navigate to the login screen
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
+    // Listen to auth state changes to handle login/logout events
+    Supabase.instance.client.auth.onAuthStateChange.listen((data) {
+      final event = data.event;
+      if (event == AuthChangeEvent.signedIn ||
+          event == AuthChangeEvent.signedOut) {
+        _redirectBasedOnAuthState();
+      }
+    });
 
-    return _isLoggedIn ? const MainScreen() : const LoginScreen();
+    // Show a loading indicator while checking auth state
+    return const Scaffold(
+      body: Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
   }
 }
 
@@ -165,7 +186,7 @@ class _MainScreenState extends State<MainScreen>
       }
     });
 
-    _loadBookmarks();
+    _getBookmarks();
 
     // Load initial articles and ask for permissions after the first frame
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -195,55 +216,64 @@ class _MainScreenState extends State<MainScreen>
     });
   }
 
-  void _toggleBookmark(Article article) {
-    setState(() {
-      if (_bookmarkedArticles.contains(article)) {
-        _bookmarkedArticles.remove(article);
-      } else {
-        if (_bookmarkedArticles.length >= 5) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content:
-                  Text('Maximum 5 bookmarks. Delete one to add a new one.'),
-              duration: Duration(seconds: 2),
-            ),
-          );
-        } else {
-          _bookmarkedArticles.add(article);
-        }
-      }
-    });
-    _saveBookmarks();
-  }
+  Future<void> _getBookmarks() async {
+    final userId = Supabase.instance.client.auth.currentUser!.id;
+    final response = await Supabase.instance
+        .client
+        .from('bookmarks')
+        .select()
+        .eq('user_id', userId);
 
-  Future<void> _loadBookmarks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getStringList('bookmarks') ?? [];
-    final loaded = <Article>[];
-    for (final item in stored) {
-      try {
-        final map = jsonDecode(item) as Map<String, dynamic>;
-        loaded.add(Article.fromJson(map));
-      } catch (_) {}
-    }
-    if (loaded.length > 5) {
-      loaded.removeRange(5, loaded.length);
-    }
-    if (mounted) {
+    if (response.error == null) {
+      final articles = (response.data as List)
+          .map((e) => Article.fromJson(e as Map<String, dynamic>))
+          .toList();
       setState(() {
         _bookmarkedArticles
           ..clear()
-          ..addAll(loaded);
+          ..addAll(articles);
       });
     }
   }
 
-  Future<void> _saveBookmarks() async {
-    final prefs = await SharedPreferences.getInstance();
-    final list = _bookmarkedArticles
-        .map((a) => jsonEncode(a.toJson()))
-        .toList(growable: false);
-    await prefs.setStringList('bookmarks', list);
+  Future<void> _toggleBookmark(Article article) async {
+    final userId = Supabase.instance.client.auth.currentUser!.id;
+    final isBookmarked =
+        _bookmarkedArticles.any((element) => element.url == article.url);
+
+    if (isBookmarked) {
+      final bookmarkedArticle = _bookmarkedArticles
+          .firstWhere((element) => element.url == article.url);
+      await Supabase.instance
+          .client
+          .from('bookmarks')
+          .delete()
+          .match({'id': bookmarkedArticle.id});
+      setState(() {
+        _bookmarkedArticles.remove(bookmarkedArticle);
+      });
+    } else {
+      final response =
+          await Supabase.instance.client.from('bookmarks').insert({
+        'user_id': userId,
+        'article_source_id': article.source.id,
+        'article_source_name': article.source.name,
+        'author': article.author,
+        'title': article.title,
+        'description': article.description,
+        'url': article.url,
+        'url_to_image': article.urlToImage,
+        'published_at': article.publishedAt?.toIso8601String(),
+        'content': article.content,
+      }).select();
+
+      if (response.error == null) {
+        final newArticle = Article.fromJson(response.data[0]);
+        setState(() {
+          _bookmarkedArticles.add(newArticle);
+        });
+      }
+    }
   }
 
   void _navigateToHome() {
@@ -359,23 +389,26 @@ class _MainScreenState extends State<MainScreen>
                 const NeverScrollableScrollPhysics(), // Menonaktifkan swipe
             children: _screens,
           ),
-          bottomNavigationBar: BottomNavigationBar(
-            items: <BottomNavigationBarItem>[
-              BottomNavigationBarItem(
-                icon: const Icon(Icons.home),
+          bottomNavigationBar: NavigationBar(
+            onDestinationSelected: _onItemTapped,
+            selectedIndex: _selectedIndex,
+            destinations: [
+              NavigationDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home),
                 label: strings.home,
               ),
-              BottomNavigationBarItem(
-                icon: const Icon(Icons.bookmark),
+              NavigationDestination(
+                icon: Icon(Icons.bookmark_border),
+                selectedIcon: Icon(Icons.bookmark),
                 label: strings.bookmark,
               ),
-              BottomNavigationBarItem(
-                icon: const Icon(Icons.info),
+              NavigationDestination(
+                icon: Icon(Icons.info_outline),
+                selectedIcon: Icon(Icons.info),
                 label: strings.about,
               ),
             ],
-            currentIndex: _selectedIndex,
-            onTap: _onItemTapped,
           ),
         );
       },

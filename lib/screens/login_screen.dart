@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/theme_toggle_button.dart';
-import '../utils/auth_service.dart';
 import '../main.dart';
 import 'register_screen.dart';
 
@@ -81,13 +81,12 @@ class _LoginScreenState extends State<LoginScreen>
     });
 
     try {
-      final authService = AuthService();
-      final success = await authService.login(
-        _usernameController.text.trim(),
-        _passwordController.text,
+      final response = await Supabase.instance.client.auth.signInWithPassword(
+        email: _usernameController.text.trim(),
+        password: _passwordController.text,
       );
 
-      if (success) {
+      if (response.user != null) {
         if (mounted) {
           Navigator.pushReplacement(
             context,
@@ -96,14 +95,14 @@ class _LoginScreenState extends State<LoginScreen>
             ),
           );
         }
-      } else {
-        setState(() {
-          _errorMessage = 'Invalid username or password';
-        });
       }
+    } on AuthException catch (e) {
+      setState(() {
+        _errorMessage = e.message;
+      });
     } catch (e) {
       setState(() {
-        _errorMessage = 'An error occurred during login';
+        _errorMessage = 'An unexpected error occurred.';
       });
     } finally {
       if (mounted) {

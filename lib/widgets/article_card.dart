@@ -99,147 +99,106 @@ class _ArticleCardState extends State<ArticleCard>
           );
         },
         child: Card(
-          margin: const EdgeInsets.only(bottom: 16),
           elevation: _isPressed ? 1 : 2,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(16),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Gambar Artikel
-              Hero(
-                tag: heroTag,
-                child: ClipRRect(
-                  borderRadius:
-                      const BorderRadius.vertical(top: Radius.circular(12)),
-                  child: widget.article.urlToImage != null
-                      ? CachedNetworkImage(
-                          imageUrl: widget.article.urlToImage!,
-                          height: 180,
-                          width: double.infinity,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            height: 180,
-                            color: Colors.grey[300],
-                            child: const Center(
-                                child: CircularProgressIndicator()),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            height: 180,
-                            color: Colors.grey[300],
-                            child: const Center(
-                              child: Icon(Icons.image_not_supported,
-                                  color: Colors.grey),
-                            ),
-                          ),
-                        )
-                      : Container(
-                          height: 180,
-                          color: Colors.grey[300],
-                          child: const Center(
-                            child: Icon(Icons.image_not_supported,
-                                color: Colors.grey),
-                          ),
+              ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(16)),
+                child: Hero(
+                  tag: heroTag,
+                  child: CachedNetworkImage(
+                    imageUrl: widget.article.urlToImage ?? '',
+                    height: 180,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      height: 180,
+                      color: Theme.of(context).colorScheme.secondaryContainer,
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: Theme.of(context).colorScheme.onSecondaryContainer,
                         ),
+                      ),
+                    ),
+                    errorWidget: (context, url, error) => Container(
+                      height: 180,
+                      color: Theme.of(context).colorScheme.secondaryContainer,
+                      child: Icon(
+                        Icons.image_not_supported,
+                        color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                  ),
                 ),
               ),
-
-              // Container dengan border bawah dan kanan KUNING
-              Container(
-                decoration: const BoxDecoration(
-                  border: Border(
-                    bottom: BorderSide(color: Colors.yellow, width: 2.0),
-                    right: BorderSide(color: Colors.yellow, width: 2.0),
-                  ),
-                  borderRadius: BorderRadius.only(
-                    bottomRight: Radius.circular(12),
-                  ),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Category and date
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 4),
-                            decoration: BoxDecoration(
-                              color: Colors.blue.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              widget.article.category,
-                              style: const TextStyle(
-                                color: Colors.blue,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.secondaryContainer,
+                            borderRadius: BorderRadius.circular(8),
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _formatDate(widget.article.publishedAt),
+                          child: Text(
+                            widget.article.category,
                             style: TextStyle(
-                              color:
-                                  Theme.of(context).textTheme.bodySmall?.color,
+                              color: Theme.of(context).colorScheme.onSecondaryContainer,
                               fontSize: 12,
+                              fontWeight: FontWeight.bold,
                             ),
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Title
-                      Text(
-                        widget.article.title,
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
                         ),
+                        const SizedBox(width: 8),
+                        Text(
+                          _formatDate(widget.article.publishedAt),
+                          style: TextStyle(
+                            color: Theme.of(context).textTheme.bodySmall?.color,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      widget.article.title,
+                      style: Theme.of(context).textTheme.titleLarge,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 8),
+                    if (widget.article.description != null)
+                      Text(
+                        widget.article.description!,
+                        style: Theme.of(context).textTheme.bodyMedium,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 8),
-
-                      // Description
-                      if (widget.article.description != null)
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
                         Text(
-                          widget.article.description!,
-                          style: TextStyle(
-                            fontSize: 14,
-                            color:
-                                Theme.of(context).textTheme.bodyMedium?.color,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                          'From ${widget.article.source.name}',
+                          style: Theme.of(context).textTheme.bodySmall,
                         ),
-                      const SizedBox(height: 16),
-
-                      // Source dan Bookmark
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'From ${widget.article.source.name}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color:
-                                  Theme.of(context).textTheme.bodySmall?.color,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          BookmarkButton(
-                            isBookmarked: widget.isBookmarked,
-                            onToggle: widget.onBookmarkToggle,
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
+                        BookmarkButton(
+                          isBookmarked: widget.isBookmarked,
+                          onToggle: widget.onBookmarkToggle,
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               ),
             ],
@@ -335,7 +294,9 @@ class _BookmarkButtonState extends State<BookmarkButton>
             scale: _scaleAnimation.value,
             child: Icon(
               widget.isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-              color: widget.isBookmarked || _isPressed ? Colors.blue : Colors.grey,
+              color: widget.isBookmarked
+                  ? Theme.of(context).colorScheme.primary
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
               size: 24,
             ),
           );

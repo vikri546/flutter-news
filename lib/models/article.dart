@@ -25,15 +25,17 @@ class Article {
 
   factory Article.fromJson(Map<String, dynamic> json) {
     return Article(
-      id: json['id'] ?? json['url'],
-      source: Source.fromJson(json['source']),
+      id: json['id'],
+      source: json['source'] != null
+          ? Source.fromJson(json['source'])
+          : Source(id: json['article_source_id'], name: json['article_source_name']),
       author: json['author'],
       title: json['title'] ?? 'No Title',
       description: json['description'],
       url: json['url'] ?? '',
-      urlToImage: json['urlToImage'],
-      publishedAt: json['publishedAt'] != null
-          ? DateTime.parse(json['publishedAt'])
+      urlToImage: json['url_to_image'],
+      publishedAt: json['published_at'] != null
+          ? DateTime.parse(json['published_at'])
           : DateTime.now(),
       content: json['content'],
       category:
@@ -43,7 +45,6 @@ class Article {
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
       'source': source.toJson(),
       'author': author,
       'title': title,
@@ -78,8 +79,8 @@ class Source {
 
   factory Source.fromJson(Map<String, dynamic> json) {
     return Source(
-      id: json['id'],
-      name: json['name'] ?? 'Unknown Source',
+      id: json['id'] ?? json['article_source_id'],
+      name: json['name'] ?? json['article_source_name'] ?? 'Unknown Source',
     );
   }
 

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/theme_toggle_button.dart';
-import '../utils/auth_service.dart';
 import 'login_screen.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -121,18 +121,18 @@ class _RegisterScreenState extends State<RegisterScreen>
     });
 
     try {
-      final authService = AuthService();
-      final success = await authService.register(
-        _usernameController.text.trim(),
-        _passwordController.text,
+      final response = await Supabase.instance.client.auth.signUp(
+        email: _usernameController.text.trim(),
+        password: _passwordController.text,
       );
 
-      if (success) {
+      if (response.user != null) {
         setState(() {
-          _successMessage = 'Registration successful! Redirecting to login...';
+          _successMessage =
+              'Registration successful! Please check your email for verification.';
         });
 
-        await Future.delayed(const Duration(seconds: 2));
+        await Future.delayed(const Duration(seconds: 3));
 
         if (mounted) {
           Navigator.pushReplacement(
@@ -142,14 +142,14 @@ class _RegisterScreenState extends State<RegisterScreen>
             ),
           );
         }
-      } else {
-        setState(() {
-          _errorMessage = 'Username already registered';
-        });
       }
+    } on AuthException catch (e) {
+      setState(() {
+        _errorMessage = e.message;
+      });
     } catch (e) {
       setState(() {
-        _errorMessage = 'An error occurred during registration';
+        _errorMessage = 'An unexpected error occurred.';
       });
     } finally {
       if (mounted) {
