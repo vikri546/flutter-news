@@ -89,7 +89,7 @@ class ArticleRepository {
     String? sortBy,
     String? language,
     int page = 1,
-    int pageSize = 20,
+    int pageSize = 100,
   }) async {
     return _apiService.searchArticles(
       query: query,

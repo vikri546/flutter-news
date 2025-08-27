@@ -13,6 +13,7 @@ import 'login_screen.dart';
 import '../providers/language_provider.dart';
 import 'notifications_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import '../widgets/chatbot_dialog.dart';
 
 // List of available categories
 const List<String> categories = [
@@ -43,7 +44,7 @@ class HomeScreenContent extends StatefulWidget {
 }
 
 class _HomeScreenContentState extends State<HomeScreenContent>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, AutomaticKeepAliveClientMixin {
   final ScrollController _scrollController = ScrollController();
   late Animation<double> _animation;
 
@@ -74,7 +75,11 @@ class _HomeScreenContentState extends State<HomeScreenContent>
   }
 
   @override
+  bool get wantKeepAlive => true;
+
+  @override
   Widget build(BuildContext context) {
+    super.build(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final articleProvider = Provider.of<ArticleProvider>(context);
     final homeScreenProvider = Provider.of<HomeScreenProvider>(context);
@@ -391,6 +396,15 @@ class _HomeScreenContentState extends State<HomeScreenContent>
                 ),
               ),
           ],
+        ),
+        floatingActionButton: FloatingActionButton(
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) => const ChatbotDialog(),
+            );
+          },
+          child: const Icon(Icons.chat),
         ),
       ),
     );

@@ -185,8 +185,8 @@ class ArticleProvider with ChangeNotifier {
 
   // Search articles
   Future<void> searchArticles(String query,
-      {required Map<String, dynamic> dateFilter,
-      required String sortBy,
+      {Map<String, dynamic>? dateFilter,
+      String? sortBy,
       String? language}) async {
     if (query.isEmpty) {
       _searchQuery = '';
@@ -210,6 +210,7 @@ class ArticleProvider with ChangeNotifier {
         query: query,
         language: language,
         sortBy: sortBy,
+        pageSize: 100,
       );
       _searchStatus = ArticleLoadingStatus.loaded;
 
