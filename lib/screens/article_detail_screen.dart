@@ -10,6 +10,7 @@ import 'dart:io';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/comment.dart';
 import '../widgets/comment_card.dart';
+import '../services/achievement_service.dart';
 
 class ArticleDetailScreen extends StatefulWidget {
   final Article article;
@@ -43,6 +44,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen>
   @override
   void initState() {
     super.initState();
+    AchievementService().logArticleRead(context, widget.article.url);
     _scrollController = ScrollController();
     _scrollController.addListener(_onScroll);
 
@@ -539,6 +541,7 @@ class _ArticleDetailScreenState extends State<ArticleDetailScreen>
                                 'comment_text': commentText,
                               });
                               _commentController.clear();
+                              AchievementService().logCommentMade(context);
                             }
                           },
                         ),

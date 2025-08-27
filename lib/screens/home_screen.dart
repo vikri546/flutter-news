@@ -14,6 +14,7 @@ import '../providers/language_provider.dart';
 import 'notifications_screen.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/chatbot_dialog.dart';
+import 'achievements_screen.dart';
 
 // List of available categories
 const List<String> categories = [
@@ -256,6 +257,18 @@ class _HomeScreenContentState extends State<HomeScreenContent>
                             .setCountryCode(newLang == 'id' ? 'id' : 'us');
                         if (mounted) Navigator.pop(context);
                       },
+                    );
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.emoji_events),
+                  title: const Text('My Achievements'),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const AchievementsScreen(),
+                      ),
                     );
                   },
                 ),
