@@ -1,8 +1,8 @@
 ---
 
-# 📰 Flutter News App
+# 📰 owrite-apps
 
-A modern **Flutter-based news application** that delivers the latest articles with a clean UI, smooth performance, and cross-platform support.  
+A modern **Flutter-based owrite application** that delivers the latest articles with a clean UI, smooth performance, and cross-platform support.  
 Built with scalability and maintainability in mind, this project is a great starting point for learning Flutter architecture, UI/UX design, and API integration.
 
 ---
@@ -77,7 +77,7 @@ flutter run
 ---
 
 ## 📸 Screenshots (Demo)
-*(Tambahkan screenshot aplikasi di sini untuk mempercantik README)*
+*(Not Yet)*
 
 ---
 
