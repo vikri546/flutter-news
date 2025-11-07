@@ -7,6 +7,7 @@ class AppStrings {
   String get appTitle => isEn ? "d'talk app" : "d'talk aplikasi";
   String get home => isEn ? 'Home' : 'Beranda';
   String get bookmark => isEn ? 'Bookmark' : 'Bookmark';
+  String get search => isEn ? 'Search' : 'Pencarian';
   String get about => isEn ? 'About' : 'Tentang';
   String get bookmarksTitle => isEn ? 'Bookmarks' : 'Bookmark';
   String get noBookmarksYet => isEn ? 'No bookmarks yet' : 'Belum ada bookmark';

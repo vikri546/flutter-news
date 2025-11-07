@@ -1,95 +1,96 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../models/article.dart';
-import '../services/api_service.dart';
-import '../utils/app_exceptions.dart';
+import '../models/article.dart'; // Pastikan path model benar
+import '../services/api_service.dart'; // Pastikan path service benar
+import '../utils/app_exceptions.dart'; // Pastikan path exceptions benar
+import 'package:flutter/foundation.dart'; // Untuk debugPrint
 
 class ArticleRepository {
   final ApiService _apiService;
-  static const String _cacheKey = 'cached_articles';
-  static const String _cacheCategoryKey = 'cached_category';
-  static const String _cacheTimestampKey = 'cache_timestamp';
 
-  // Cache expiration time (30 minutes)
-  static const int _cacheExpirationMinutes = 30;
+  // Kunci SharedPreferences untuk cache
+  static const String _cachePrefix = 'articles_cache_'; // Awalan untuk kunci cache
+  // Kunci spesifik untuk data, timestamp, dan kategori
+  static const String _cacheDataKeySuffix = '_data';
+  static const String _cacheTimestampKeySuffix = '_timestamp';
 
+  // Waktu kedaluwarsa cache (dalam menit)
+  static const int _cacheExpirationMinutes = 15; // Cache 15 menit
+
+  // Constructor: Inisialisasi ApiService
   ArticleRepository({ApiService? apiService})
       : _apiService = apiService ?? ApiService();
 
-  // Get articles by category with caching
+  // --- DIPERBARUI: Mengambil artikel berdasarkan nama kategori dengan cache ---
   Future<List<Article>> getArticlesByCategory(
-    String category, {
+    String? categoryName, { // Terima String? (bisa null untuk "Semua Berita")
     bool forceRefresh = false,
     int page = 1,
     int pageSize = 20,
-    String country = 'us',
   }) async {
-    // If it's the first page and not forcing refresh, try to get from cache
+    // Gunakan nama kategori (atau 'all' jika null) sebagai bagian dari kunci cache
+    final String cacheCategoryIdentifier = categoryName ?? 'all';
+
+    // 1. Coba ambil dari cache jika halaman pertama dan tidak dipaksa refresh
     if (page == 1 && !forceRefresh) {
       try {
-        final cachedArticles = await _getCachedArticles(category);
-        if (cachedArticles.isNotEmpty) {
+        final cachedArticles = await _getCachedArticles(cacheCategoryIdentifier);
+        if (cachedArticles != null) { // Jika cache valid dan tidak kedaluwarsa
+          debugPrint("Cache hit for category: $cacheCategoryIdentifier");
           return cachedArticles;
         }
+         debugPrint("Cache miss or expired for category: $cacheCategoryIdentifier");
       } catch (e) {
-        // If there's an error with the cache, continue to fetch from API
-        print('Cache error: ${e.toString()}');
+        // Abaikan error cache dan lanjut fetch dari API
+        debugPrint('Cache read error for $cacheCategoryIdentifier: $e');
       }
     }
 
-    // Fetch from API
+    // 2. Jika cache tidak ada/kedaluwarsa/forceRefresh, fetch dari API
     try {
-      List<Article> articles;
-      if (country.toLowerCase() == 'id' && category == 'All') {
-        // Use everything endpoint with language=id and query=indonesia
-        articles = await _apiService.searchArticles(
-          query: 'indonesia',
-          language: 'id',
-          sortBy: 'publishedAt',
-          page: page,
-          pageSize: pageSize,
-        );
-      } else {
-        articles = await _apiService.getTopHeadlines(
-          country: country,
-          category: category == 'All' ? null : category,
-          page: page,
-          pageSize: pageSize,
-        );
-      }
+      // Panggil ApiService yang sudah melakukan filter server-side
+      final List<Article> articles = await _apiService.getArticlesByCategory(
+        categoryName, // Teruskan nama kategori (bisa null)
+        page: page,
+        pageSize: pageSize,
+      );
 
-      // Cache the first page results
+      // 3. Simpan hasil halaman pertama ke cache
       if (page == 1) {
-        await _cacheArticles(articles, category);
+        await _cacheArticles(articles, cacheCategoryIdentifier);
       }
 
       return articles;
     } catch (e) {
-      // If API fails and it's the first page, try to return cached data even if expired
+      // 4. Jika API gagal & ini halaman pertama, coba kembalikan cache kedaluwarsa (jika ada)
       if (page == 1) {
         try {
-          final cachedArticles =
-              await _getCachedArticles(category, ignoreExpiration: true);
-          if (cachedArticles.isNotEmpty) {
-            return cachedArticles;
+          final cachedArticles = await _getCachedArticles(cacheCategoryIdentifier, ignoreExpiration: true);
+          if (cachedArticles != null && cachedArticles.isNotEmpty) {
+             debugPrint("API failed, returning expired cache for category: $cacheCategoryIdentifier");
+            return cachedArticles; // Kembalikan cache lama sebagai fallback
           }
-        } catch (_) {
-          // If cache also fails, rethrow the original API exception
+        } catch (cacheError) {
+          // Jika cache juga gagal dibaca, biarkan error API asli yang di-throw
+           debugPrint("Expired cache read error for $cacheCategoryIdentifier: $cacheError");
         }
       }
-
+      // Jika bukan halaman pertama atau fallback cache gagal, rethrow error API
       rethrow;
     }
   }
+  // --- AKHIR PERUBAHAN ---
 
-  // Search articles
+
+  // Mencari artikel (langsung panggil ApiService, tanpa cache pencarian saat ini)
   Future<List<Article>> searchArticles({
     required String query,
-    String? sortBy,
-    String? language,
+    String? sortBy, // 'date', 'relevance', dll.
+    String? language, // Diabaikan oleh ApiService WP
     int page = 1,
     int pageSize = 20,
   }) async {
+    // Langsung teruskan ke ApiService
     return _apiService.searchArticles(
       query: query,
       sortBy: sortBy,
@@ -99,79 +100,99 @@ class ArticleRepository {
     );
   }
 
-  // Cache articles
-  Future<void> _cacheArticles(List<Article> articles, String category) async {
+  // --- DIPERBARUI: Menyimpan artikel ke cache berdasarkan identifier kategori ---
+  Future<void> _cacheArticles(List<Article> articles, String categoryIdentifier) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final articlesJson =
-          json.encode(articles.map((e) => e.toJson()).toList());
+      // Encode list artikel ke JSON string
+      final articlesJson = json.encode(articles.map((e) => e.toJson()).toList());
 
-      await prefs.setString(_cacheKey, articlesJson);
-      await prefs.setString(_cacheCategoryKey, category);
-      await prefs.setInt(
-          _cacheTimestampKey, DateTime.now().millisecondsSinceEpoch);
+      // Buat kunci spesifik untuk data dan timestamp
+      final String dataKey = '$_cachePrefix${categoryIdentifier}$_cacheDataKeySuffix';
+      final String timestampKey = '$_cachePrefix${categoryIdentifier}$_cacheTimestampKeySuffix';
+
+      // Simpan data dan timestamp saat ini
+      await prefs.setString(dataKey, articlesJson);
+      await prefs.setInt(timestampKey, DateTime.now().millisecondsSinceEpoch);
+      debugPrint("Articles cached for category: $categoryIdentifier");
     } catch (e) {
-      throw CacheException('Failed to cache articles: ${e.toString()}');
+      // Gagal menyimpan cache, laporkan sebagai CacheException
+      throw CacheException('Gagal menyimpan cache untuk kategori $categoryIdentifier: $e');
     }
   }
+  // --- AKHIR PERUBAHAN ---
 
-  // Get cached articles
-  Future<List<Article>> _getCachedArticles(String category,
-      {bool ignoreExpiration = false}) async {
+
+  // --- DIPERBARUI: Mengambil artikel dari cache berdasarkan identifier kategori ---
+  Future<List<Article>?> _getCachedArticles(String categoryIdentifier, {bool ignoreExpiration = false}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Check if cache exists
-      if (!prefs.containsKey(_cacheKey) ||
-          !prefs.containsKey(_cacheCategoryKey) ||
-          !prefs.containsKey(_cacheTimestampKey)) {
-        return [];
+      // Buat kunci spesifik
+      final String dataKey = '$_cachePrefix${categoryIdentifier}$_cacheDataKeySuffix';
+      final String timestampKey = '$_cachePrefix${categoryIdentifier}$_cacheTimestampKeySuffix';
+
+      // Cek apakah data dan timestamp ada di cache
+      if (!prefs.containsKey(dataKey) || !prefs.containsKey(timestampKey)) {
+        return null; // Cache tidak ada
       }
 
-      // Check if cache is for the requested category
-      final cachedCategory = prefs.getString(_cacheCategoryKey);
-      if (cachedCategory != category && category != 'All') {
-        return [];
-      }
-
-      // Check if cache is expired
+      // Cek kedaluwarsa cache (kecuali jika diabaikan)
       if (!ignoreExpiration) {
-        final cacheTimestamp = prefs.getInt(_cacheTimestampKey) ?? 0;
-        final cacheAge = DateTime.now().millisecondsSinceEpoch - cacheTimestamp;
-        final cacheAgeMinutes = cacheAge / (1000 * 60);
+        final cacheTimestamp = prefs.getInt(timestampKey) ?? 0;
+        final cacheAgeMillis = DateTime.now().millisecondsSinceEpoch - cacheTimestamp;
+        final cacheAgeMinutes = cacheAgeMillis / (1000 * 60);
 
         if (cacheAgeMinutes > _cacheExpirationMinutes) {
-          return [];
+          debugPrint("Cache expired for category: $categoryIdentifier");
+          // Hapus cache yang kedaluwarsa (opsional, agar bersih)
+          await prefs.remove(dataKey);
+          await prefs.remove(timestampKey);
+          return null; // Cache kedaluwarsa
         }
       }
 
-      // Get cached articles
-      final articlesJson = prefs.getString(_cacheKey);
+      // Ambil data JSON dari cache
+      final articlesJson = prefs.getString(dataKey);
       if (articlesJson == null) {
-        return [];
+        return null; // Data cache hilang secara aneh
       }
 
-      final List<dynamic> decodedArticles = json.decode(articlesJson);
-      return decodedArticles.map((e) => Article.fromJson(e)).toList();
+      // Decode JSON dan parse menjadi List<Article>
+      final List<dynamic> decodedList = json.decode(articlesJson);
+      final List<Article> articles = decodedList
+          .map((item) => Article.fromJson(item as Map<String, dynamic>))
+          .toList();
+
+      return articles; // Kembalikan data cache
     } catch (e) {
-      throw CacheException('Failed to get cached articles: ${e.toString()}');
+      // Gagal membaca cache, laporkan sebagai CacheException
+      throw CacheException('Gagal membaca cache untuk kategori $categoryIdentifier: $e');
     }
   }
+  // --- AKHIR PERUBAHAN ---
 
-  // Clear cache
+
+  // Membersihkan *semua* cache artikel (bukan per kategori)
   Future<void> clearCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_cacheKey);
-      await prefs.remove(_cacheCategoryKey);
-      await prefs.remove(_cacheTimestampKey);
+      // Dapatkan semua kunci yang ada di SharedPreferences
+      final allKeys = prefs.getKeys();
+      // Filter kunci yang dimulai dengan awalan cache artikel
+      final articleCacheKeys = allKeys.where((key) => key.startsWith(_cachePrefix)).toList();
+      // Hapus semua kunci cache artikel yang ditemukan
+      for (final key in articleCacheKeys) {
+        await prefs.remove(key);
+      }
+      debugPrint("All article caches cleared.");
     } catch (e) {
-      throw CacheException('Failed to clear cache: ${e.toString()}');
+      throw CacheException('Gagal membersihkan cache: $e');
     }
   }
 
-  // Dispose resources
+  // Dispose ApiService (jika perlu)
   void dispose() {
-    _apiService.dispose();
+    _apiService.dispose(); // Panggil dispose ApiService
   }
 }

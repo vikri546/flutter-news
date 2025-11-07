@@ -4,15 +4,15 @@
     "type": "APK",
     "kind": "Directory"
   },
-  "applicationId": "com.example.dtalk_app",
+  "applicationId": "com.example.owrite",
   "variantName": "debug",
   "elements": [
     {
       "type": "SINGLE",
       "filters": [],
       "attributes": [],
-      "versionCode": 2,
-      "versionName": "3.1.6",
+      "versionCode": 1,
+      "versionName": "1.0.0",
       "outputFile": "app-debug.apk"
     }
   ],

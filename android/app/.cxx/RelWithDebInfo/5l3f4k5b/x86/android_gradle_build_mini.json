@@ -1,0 +1,20 @@
+{
+  "buildFiles": [
+    "/usr/lib/flutter/packages/flutter_tools/gradle/src/main/scripts/CMakeLists.txt"
+  ],
+  "cleanCommandsComponents": [
+    [
+      "/opt/android-sdk/cmake/3.22.1/bin/ninja",
+      "-C",
+      "/home/Vikk/Documents/Project-V/Aplikasi/flutter-news/android/app/.cxx/RelWithDebInfo/5l3f4k5b/x86",
+      "clean"
+    ]
+  ],
+  "buildTargetsCommandComponents": [
+    "/opt/android-sdk/cmake/3.22.1/bin/ninja",
+    "-C",
+    "/home/Vikk/Documents/Project-V/Aplikasi/flutter-news/android/app/.cxx/RelWithDebInfo/5l3f4k5b/x86",
+    "{LIST_OF_TARGETS_TO_BUILD}"
+  ],
+  "libraries": {}
+}

@@ -2,6 +2,7 @@
     
     <!-- Internet permission -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
     
     <!-- Query all packages permission for Android 11+ -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
@@ -19,7 +20,7 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     
     <application
-        android:label="d'talk"
+        android:label="owrite"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         

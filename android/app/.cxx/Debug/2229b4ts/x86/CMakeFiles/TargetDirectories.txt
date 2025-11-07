@@ -1,0 +1,2 @@
+/home/Vikk/Documents/Project-V/Aplikasi/flutter-news/android/app/.cxx/Debug/2229b4ts/x86/CMakeFiles/edit_cache.dir
+/home/Vikk/Documents/Project-V/Aplikasi/flutter-news/android/app/.cxx/Debug/2229b4ts/x86/CMakeFiles/rebuild_cache.dir

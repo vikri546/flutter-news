@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../widgets/theme_toggle_button.dart';
 import '../utils/auth_service.dart';
 import '../main.dart';
-import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -11,8 +10,7 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen>
-    with TickerProviderStateMixin {
+class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -20,53 +18,25 @@ class _LoginScreenState extends State<LoginScreen>
   String? _errorMessage;
   bool _obscurePassword = true;
 
-  late AnimationController _slideController;
-  late Animation<Offset> _leftSlideAnimation;
-  late Animation<Offset> _rightSlideAnimation;
+  late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
-    _slideController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 700),
       vsync: this,
     );
-
-    // PERBAIKAN: Mengubah Tween agar widget meluncur dari tengah ke posisi akhir.
-    // Animasi untuk logo di sisi kiri.
-    _leftSlideAnimation = Tween<Offset>(
-      begin: const Offset(1.5, 0.0), // Mulai dari kanan (di luar area terlihat)
-      end: Offset.zero, // Berakhir di posisi normalnya
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
-    ));
-
-    // PERBAIKAN: Mengubah Tween agar widget meluncur dari tengah ke posisi akhir.
-    // Animasi untuk teks di sisi kanan.
-    _rightSlideAnimation = Tween<Offset>(
-      begin: const Offset(-1.5, 0.0), // Mulai dari kiri (di luar area terlihat)
-      end: Offset.zero, // Berakhir di posisi normalnya
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: const Interval(0.0, 0.6, curve: Curves.easeOut),
-    ));
-
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(
-      parent: _slideController,
-      curve: const Interval(0.6, 1.0, curve: Curves.easeIn),
-    ));
-
-    _slideController.forward();
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _fadeController, curve: Curves.easeIn),
+    );
+    _fadeController.forward();
   }
 
   @override
   void dispose() {
-    _slideController.dispose();
+    _fadeController.dispose();
     _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
@@ -87,23 +57,47 @@ class _LoginScreenState extends State<LoginScreen>
         _passwordController.text,
       );
 
-      if (success) {
-        if (mounted) {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const MainScreen(),
-            ),
-          );
-        }
+      if (success && mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const MainScreen()),
+        );
       } else {
         setState(() {
-          _errorMessage = 'Invalid username or password';
+          _errorMessage = 'Username atau password salah';
         });
       }
     } catch (e) {
       setState(() {
-        _errorMessage = 'An error occurred during login';
+        _errorMessage = 'Gagal terhubung ke server. Coba lagi.';
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _continueAsGuest() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final authService = AuthService();
+      await authService.loginAsGuest();
+
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const MainScreen()),
+        );
+      }
+    } catch (e) {
+      setState(() {
+        _errorMessage = 'Terjadi kesalahan';
       });
     } finally {
       if (mounted) {
@@ -117,310 +111,161 @@ class _LoginScreenState extends State<LoginScreen>
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    const Color stabiloGreen = Color(0xFFAEEE00);
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: const [
-          ThemeToggleButton(),
-        ],
-      ),
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            children: [
-              const SizedBox(height: 40),
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SizedBox(height: MediaQuery.of(context).size.height * 0.1),
 
-              // Logo Section with Vertical Line Animation
-              SizedBox(
-                height: 80,
-                child: Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    // Vertical Line
-                    Container(
-                      width: 3,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.yellow[700]!.withOpacity(0.3),
-                            Colors.yellow[700]!,
-                            Colors.yellow[700]!.withOpacity(0.3),
-                          ],
-                        ),
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-
-                    // Content Row
-                    Row(
-                      children: [
-                        // PERBAIKAN: Menambahkan ClipRect untuk menyembunyikan widget sebelum animasi.
-                        // Left logo/icon - slides from center line to left
-                        Expanded(
-                          child: ClipRect(
-                            child: SlideTransition(
-                              position: _leftSlideAnimation,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    width: 60,
-                                    height: 60,
-                                    decoration: BoxDecoration(
-                                      color: Colors.yellow[700],
-                                      borderRadius: BorderRadius.circular(5),
-                                      border: Border.all(
-                                        color: Colors.yellow[700]!,
-                                        width: 1,
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.yellow[700]!
-                                              .withOpacity(0.3),
-                                          blurRadius: 10,
-                                          offset: const Offset(0, 4),
-                                        ),
-                                      ],
-                                    ),
-                                    child: Image.asset(
-                                      'assets/images/icon.png',
-                                      width: 40,
-                                      height: 40,
-                                      fit: BoxFit.contain,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // PERBAIKAN: Menghapus SizedBox yang mengganggu perataan.
-
-                        // PERBAIKAN: Menambahkan ClipRect untuk menyembunyikan widget sebelum animasi.
-                        // Right content - slides from center line to right
-                        Expanded(
-                          child: ClipRect(
-                            child: SlideTransition(
-                              position: _rightSlideAnimation,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Text(
-                                        "d'talk news",
-                                        style: TextStyle(
-                                          fontSize: 20,
-                                          fontWeight: FontWeight.bold,
-                                          color: isDark
-                                              ? Colors.white
-                                              : Colors.black87,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        'stay informed, stay ahead',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          color: isDark
-                                              ? Colors.grey[400]
-                                              : Colors.grey[600],
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                Image.asset(
+                  isDark
+                      ? 'assets/images/banner-owrite-black.jpg'
+                      : 'assets/images/banner-owrite-white.jpg',
+                  height: 55,
                 ),
-              ),
+                const SizedBox(height: 20),
 
-              const SizedBox(height: 60),
+                Text(
+                  "Masuk",
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  "Hai, selamat datang kembali.",
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        color: Colors.grey[600],
+                      ),
+                ),
+                const SizedBox(height: 32),
 
-              // Form Section
-              FadeTransition(
-                opacity: _fadeAnimation,
-                child: Form(
+                Form(
                   key: _formKey,
                   child: Column(
                     children: [
-                      // Username field
                       TextFormField(
                         controller: _usernameController,
-                        decoration: InputDecoration(
-                          labelText: 'Username',
-                          hintText: 'Enter your username',
-                          prefixIcon: Icon(
-                            Icons.person,
-                            color: Colors.yellow[700],
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            borderSide: BorderSide(
-                              color: isDark
-                                  ? Colors.grey[700]!
-                                  : Colors.grey[300]!,
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            borderSide: BorderSide(
-                              color: Colors.yellow[700]!,
-                              width: 2,
-                            ),
-                          ),
-                          filled: true,
-                          fillColor: isDark
-                              ? Colors.grey[900]?.withOpacity(0.5)
-                              : Colors.grey[50],
+                        decoration: _buildInputDecoration(
+                          context: context,
+                          label: 'Username',
+                          hint: 'Masukkan Username Anda',
+                          icon: Icons.person_outline,
+                          isDark: isDark,
+                          accentColor: stabiloGreen,
                         ),
+                        keyboardType: TextInputType.text,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Username cannot be empty';
+                            return 'Username tidak boleh kosong';
                           }
                           return null;
                         },
                       ),
-
                       const SizedBox(height: 20),
 
-                      // Password field
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
-                        decoration: InputDecoration(
-                          labelText: 'Password',
-                          hintText: 'Enter your password',
-                          prefixIcon: Icon(
-                            Icons.lock,
-                            color: Colors.yellow[700],
-                          ),
-                          suffixIcon: IconButton(
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                              color: Colors.yellow[700],
-                            ),
+                        decoration: _buildInputDecoration(
+                          context: context,
+                          label: 'Password',
+                          hint: 'Masukkan password Anda',
+                          icon: Icons.lock_outline,
+                          isDark: isDark,
+                          accentColor: stabiloGreen,
+                        ).copyWith(
+                          suffixIcon: TextButton(
                             onPressed: () {
                               setState(() {
                                 _obscurePassword = !_obscurePassword;
                               });
                             },
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            borderSide: BorderSide(
-                              color: isDark
-                                  ? Colors.grey[700]!
-                                  : Colors.grey[300]!,
+                            child: Text(
+                              _obscurePassword ? 'Show' : 'Hide',
+                              style: TextStyle(
+                                color: isDark ? Colors.grey[200] : Colors.black,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(15),
-                            borderSide: BorderSide(
-                              color: Colors.yellow[700]!,
-                              width: 2,
-                            ),
-                          ),
-                          filled: true,
-                          fillColor: isDark
-                              ? Colors.grey[900]?.withOpacity(0.5)
-                              : Colors.grey[50],
                         ),
                         validator: (value) {
                           if (value == null || value.isEmpty) {
-                            return 'Password cannot be empty';
+                            return 'Password tidak boleh kosong';
                           }
                           return null;
                         },
                       ),
 
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 10),
 
-                      // Error message
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Password: gunakan username Anda',
+                          style: TextStyle(
+                            color: isDark ? Colors.grey[400] : Colors.grey[600],
+                            fontSize: 12,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
                       if (_errorMessage != null)
                         Container(
                           width: double.infinity,
-                          padding: const EdgeInsets.all(16),
+                          padding: const EdgeInsets.all(12),
                           margin: const EdgeInsets.only(bottom: 20),
                           decoration: BoxDecoration(
                             color: Colors.red.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: Colors.red.withOpacity(0.3),
-                            ),
                           ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.error_outline,
-                                color: Colors.red,
-                                size: 20,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  _errorMessage!,
-                                  style: const TextStyle(
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ),
-                            ],
+                          child: Text(
+                            _errorMessage!,
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: Colors.red,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ),
 
-                      // Login button
                       SizedBox(
                         width: double.infinity,
                         height: 55,
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _login,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.yellow[700],
+                            backgroundColor: stabiloGreen,
                             foregroundColor: Colors.black,
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(15),
+                              borderRadius: BorderRadius.circular(5),
                             ),
                             elevation: 0,
-                            shadowColor: Colors.transparent,
                           ),
                           child: _isLoading
                               ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
+                                  height: 24,
+                                  width: 24,
                                   child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.black),
+                                    strokeWidth: 3,
+                                    valueColor: AlwaysStoppedAnimation<Color>(Colors.black),
                                   ),
                                 )
                               : const Text(
-                                  'Sign In',
+                                  'Masuk',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.bold,
@@ -428,51 +273,135 @@ class _LoginScreenState extends State<LoginScreen>
                                 ),
                         ),
                       ),
-
-                      const SizedBox(height: 30),
-
-                      // Register link
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            "Don't have an account? ",
-                            style: TextStyle(
-                              color:
-                                  isDark ? Colors.grey[400] : Colors.grey[600],
-                              fontSize: 16,
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => const RegisterScreen(),
-                                ),
-                              );
-                            },
-                            child: Text(
-                              'Sign Up',
-                              style: TextStyle(
-                                color: Colors.yellow[700],
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                                decoration: TextDecoration.underline,
-                                decorationColor: Colors.yellow[700],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
                     ],
                   ),
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 32),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: Divider(
+                        color: isDark ? Colors.grey[700] : Colors.grey[300],
+                        thickness: 1,
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'atau',
+                        style: TextStyle(
+                          color: isDark ? Colors.grey[400] : Colors.grey[600],
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Divider(
+                        color: isDark ? Colors.grey[700] : Colors.grey[300],
+                        thickness: 1,
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 24),
+
+                SizedBox(
+                  width: double.infinity,
+                  height: 55,
+                  child: OutlinedButton(
+                    onPressed: _isLoading ? null : _continueAsGuest,
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: isDark ? Colors.white : Colors.black,
+                      side: BorderSide(
+                        color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+                        width: 1.5,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(5),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.person_outline,
+                          size: 20,
+                          color: isDark ? Colors.white : Colors.black,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Lanjutkan sebagai Guest',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: isDark ? Colors.white : Colors.black,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                SizedBox(height: MediaQuery.of(context).size.height * 0.03),
+
+                const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text("Ganti Mode", style: TextStyle(color: Colors.grey)),
+                    SizedBox(width: 8),
+                    ThemeToggleButton(),
+                  ],
+                ),
+                const SizedBox(height: 20),
+              ],
+            ),
           ),
         ),
       ),
+    );
+  }
+
+  InputDecoration _buildInputDecoration({
+    required BuildContext context,
+    required String label,
+    required String hint,
+    required IconData icon,
+    required bool isDark,
+    required Color accentColor,
+  }) {
+    final outlineBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(5),
+      borderSide: BorderSide(
+        color: isDark ? Colors.grey[700]! : Colors.grey[300]!,
+      ),
+    );
+
+    final focusedBorder = OutlineInputBorder(
+      borderRadius: BorderRadius.circular(5),
+      borderSide: BorderSide(
+        color: accentColor,
+        width: 2,
+      ),
+    );
+
+    return InputDecoration(
+      labelText: label,
+      labelStyle: TextStyle(
+        color: isDark ? Colors.grey[400] : Colors.grey[700],
+        fontWeight: FontWeight.w500,
+      ),
+      hintText: hint,
+      border: outlineBorder,
+      enabledBorder: outlineBorder,
+      focusedBorder: focusedBorder,
+      filled: true,
+      fillColor: isDark ? Colors.grey[900]?.withOpacity(0.5) : Colors.grey[50],
+      floatingLabelBehavior: FloatingLabelBehavior.never,
+      contentPadding: const EdgeInsets.symmetric(vertical: 16, horizontal: 16),
     );
   }
 }

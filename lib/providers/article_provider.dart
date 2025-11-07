@@ -1,231 +1,211 @@
 import 'package:flutter/foundation.dart';
-import '../models/article.dart';
-import '../repositories/article_repository.dart';
-import '../utils/app_exceptions.dart';
-import '../services/background_notification_service.dart';
+import '../models/article.dart'; // Pastikan path model benar
+import '../repositories/article_repository.dart'; // Pastikan path repository benar
+import '../utils/app_exceptions.dart'; // Pastikan path exceptions benar
+import '../services/background_notification_service.dart'; // Pastikan path service benar
 
+// Enum untuk status loading artikel
 enum ArticleLoadingStatus {
-  initial,
-  loading,
-  loaded,
-  error,
-  loadingMore,
-  noMoreData,
+  initial, // Keadaan awal
+  loading, // Sedang memuat halaman pertama atau refresh
+  loaded, // Berhasil memuat
+  error, // Terjadi error saat memuat
+  loadingMore, // Sedang memuat halaman berikutnya
+  noMoreData, // Sudah mencapai halaman terakhir
 }
 
+// Provider untuk mengelola state artikel
 class ArticleProvider with ChangeNotifier {
-  final ArticleRepository _repository;
-  final BackgroundNotificationService _backgroundService =
-      BackgroundNotificationService();
+  final ArticleRepository _repository; // Repository untuk mengambil data
+  final BackgroundNotificationService _backgroundService = BackgroundNotificationService(); // Service notifikasi
 
-  // Articles data
-  List<Article> _articles = [];
-  String _currentCategory = 'All';
-  String _errorMessage = '';
-  ArticleLoadingStatus _status = ArticleLoadingStatus.initial;
+  // State utama
+  List<Article> _articles = []; // Daftar artikel yang ditampilkan
+  String? _currentCategory; // Kategori yang sedang aktif (null untuk 'Semua Berita')
+  String _errorMessage = ''; // Pesan error jika terjadi
+  ArticleLoadingStatus _status = ArticleLoadingStatus.initial; // Status loading saat ini
 
-  // Pagination
-  int _currentPage = 1;
-  bool _hasMorePages = true;
+  // State untuk paginasi
+  int _currentPage = 1; // Halaman saat ini
+  bool _hasMorePages = true; // Apakah masih ada halaman berikutnya
+  static const int _pageSize = 20; // Jumlah artikel per halaman
 
-  // Search
+  // State untuk pencarian (jika diperlukan di masa depan)
   String _searchQuery = '';
   List<Article> _searchResults = [];
   ArticleLoadingStatus _searchStatus = ArticleLoadingStatus.initial;
 
-  // Language / country for feed
-  String _countryCode = 'us';
-  String get countryCode => _countryCode;
-
-  // Previous articles for comparison
+  // Menyimpan daftar artikel sebelumnya untuk cek notifikasi
   List<Article> _previousArticles = [];
 
-  // Getters
+  // Getters publik untuk mengakses state
   List<Article> get articles => _articles;
-  String get currentCategory => _currentCategory;
+  // Menampilkan "Semua Berita" jika _currentCategory null
+  String get currentCategory => _currentCategory ?? 'Semua Berita';
   String get errorMessage => _errorMessage;
   ArticleLoadingStatus get status => _status;
   bool get hasMorePages => _hasMorePages;
-
   String get searchQuery => _searchQuery;
   List<Article> get searchResults => _searchResults;
   ArticleLoadingStatus get searchStatus => _searchStatus;
 
+  String _detectArticleCategory(Article article) {
+     // Analisis kata kunci dari title artikel
+     // Return kategori yang sesuai
+     return 'NASIONAL'; // Default
+   }
+
+  // Constructor, inisialisasi repository
   ArticleProvider({ArticleRepository? repository})
       : _repository = repository ?? ArticleRepository();
 
-  // Set country (based on language) and refresh
-  Future<void> setCountryCode(String countryCode) async {
-    if (_countryCode == countryCode) return;
-    _countryCode = countryCode;
-    _currentPage = 1;
-    _hasMorePages = true;
-    _articles = [];
-    _status = ArticleLoadingStatus.loading;
-    notifyListeners();
-    await loadArticles(refresh: true);
-  }
-
-  // Load initial articles
+  // Fungsi utama untuk memuat artikel
   Future<void> loadArticles({bool refresh = false}) async {
+    // 1. Atur status loading berdasarkan kondisi (refresh, load more, atau initial load)
     if (refresh) {
-      _currentPage = 1;
-      _hasMorePages = true;
+      _currentPage = 1; // Reset halaman ke 1 jika refresh
+      _hasMorePages = true; // Anggap ada halaman lagi saat refresh
       _status = ArticleLoadingStatus.loading;
-    } else if (_status == ArticleLoadingStatus.loading ||
-        _status == ArticleLoadingStatus.loadingMore) {
-      return; // Prevent multiple simultaneous requests
+    } else if (_status == ArticleLoadingStatus.loading || _status == ArticleLoadingStatus.loadingMore) {
+      return; // Hindari request ganda jika sedang loading
     } else if (_currentPage > 1) {
-      _status = ArticleLoadingStatus.loadingMore;
+      _status = ArticleLoadingStatus.loadingMore; // Status untuk memuat halaman berikutnya
     } else {
-      _status = ArticleLoadingStatus.loading;
+      _status = ArticleLoadingStatus.loading; // Status untuk memuat halaman pertama
     }
-
+    // Beri tahu listener (UI) bahwa state berubah (loading dimulai)
     notifyListeners();
 
     try {
+      // 2. Panggil repository untuk mengambil data artikel
+      // Kirimkan _currentCategory (bisa null) agar repository tahu kategori mana yang diminta
       final newArticles = await _repository.getArticlesByCategory(
-        _currentCategory,
-        forceRefresh: refresh,
+        _currentCategory, // Null jika "Semua Berita"
+        forceRefresh: refresh, // Parameter opsional untuk cache repository
         page: _currentPage,
-        country: _countryCode,
+        pageSize: _pageSize,
       );
 
+      // 3. Proses hasil dari repository
       if (_currentPage == 1) {
-        _previousArticles = List.from(_articles);
-        _articles = newArticles;
+        // Jika ini halaman pertama (atau refresh)
+        _previousArticles = List.from(_articles); // Simpan daftar lama untuk cek notifikasi
+        _articles = newArticles; // Ganti daftar artikel dengan yang baru
 
-        // Check for new articles and send notifications
+        // Cek notifikasi hanya saat refresh dan ada artikel baru
         if (refresh && _articles.isNotEmpty) {
           await _checkForNewArticles();
         }
       } else {
-        // Filter out duplicates when adding more pages
-        final uniqueNewArticles = newArticles
-            .where((article) => !_articles.any((a) => a.id == article.id))
-            .toList();
-
-        _articles.addAll(uniqueNewArticles);
+        // Jika ini halaman berikutnya (load more)
+        // Hindari duplikasi artikel (berdasarkan ID) sebelum ditambahkan
+        final uniqueNewArticles = newArticles.where((article) => !_articles.any((a) => a.id == article.id)).toList();
+        _articles.addAll(uniqueNewArticles); // Tambahkan artikel unik ke daftar yang ada
       }
 
-      // Check if we've reached the end of the data
-      if (newArticles.isEmpty || newArticles.length < 20) {
+      // 4. Update status paginasi dan loading
+      // Jika jumlah artikel baru kurang dari ukuran halaman, berarti sudah halaman terakhir
+      if (newArticles.isEmpty || newArticles.length < _pageSize) {
         _hasMorePages = false;
-        _status = ArticleLoadingStatus.noMoreData;
+        _status = ArticleLoadingStatus.noMoreData; // Tandai sudah tidak ada data lagi
       } else {
-        _currentPage++;
-        _status = ArticleLoadingStatus.loaded;
+        _currentPage++; // Naikkan nomor halaman untuk request berikutnya
+        _status = ArticleLoadingStatus.loaded; // Tandai loading selesai
       }
     } catch (e) {
-      _status = ArticleLoadingStatus.error;
-      _errorMessage = e is AppException ? e.message : 'Failed to load articles';
+      // 5. Tangani error jika terjadi
+      _status = ArticleLoadingStatus.error; // Set status error
+      _errorMessage = e is AppException ? e.message : 'Gagal memuat artikel'; // Ambil pesan error
+      debugPrint("Error loading articles in provider: $e"); // Log error untuk debug
+    } finally {
+       // 6. Selalu beri tahu listener (UI) setelah selesai, baik sukses maupun error
+       // Cek mounted jika berada di dalam context widget, tapi di provider tidak perlu
+       notifyListeners();
     }
-
-    notifyListeners();
   }
 
-  // Check for new articles and send notifications
+  // Cek apakah ada artikel baru dibandingkan sebelumnya dan kirim notifikasi
   Future<void> _checkForNewArticles() async {
-    if (_previousArticles.isEmpty) return;
+     if (_previousArticles.isEmpty) return; // Tidak bisa dibandingkan jika list sebelumnya kosong
 
-    // Find new articles (articles that weren't in the previous list)
-    final newArticles = _articles
-        .where((article) => !_previousArticles
-            .any((prevArticle) => prevArticle.id == article.id))
-        .toList();
+     // Filter artikel baru (yang ada di _articles tapi tidak ada di _previousArticles)
+     final newArticles = _articles.where((a) => !_previousArticles.any((p) => p.id == a.id)).toList();
 
-    if (newArticles.isNotEmpty) {
-      // Send breaking news notification for the first new article
-      await _backgroundService.sendBreakingNewsNotification(newArticles.first);
-
-      // If there are multiple new articles, send a trending notification
-      if (newArticles.length > 1) {
-        await _backgroundService.sendTrendingNotification();
-      }
-    }
+     // Jika ada artikel baru
+     if(newArticles.isNotEmpty) {
+        // Kirim notifikasi Breaking News untuk artikel pertama
+        final category = _detectArticleCategory(newArticles.first);
+          await _backgroundService.sendBreakingNewsNotification(
+            newArticles.first,
+            category,         // Jika lebih dari 1 artikel baru, kirim notifikasi Trending
+          );
+        if(newArticles.length > 1) await _backgroundService.sendTrendingNotification();
+     }
   }
 
-  // Change category
-  Future<void> changeCategory(String category) async {
+  // Fungsi untuk mengganti kategori berita
+  Future<void> changeCategory(String? category) async {
+    // Jika kategori yang dipilih sama dengan yang aktif, tidak perlu load ulang
     if (_currentCategory == category) return;
 
-    _currentCategory = category;
+    _currentCategory = category; // Update kategori aktif (bisa null)
+    // Reset state paginasi dan daftar artikel
     _currentPage = 1;
     _hasMorePages = true;
-    _articles = [];
-    _status = ArticleLoadingStatus.loading;
+    _articles = []; // Kosongkan list saat ganti kategori
+    _status = ArticleLoadingStatus.loading; // Set status loading
 
-    notifyListeners();
-
-    // For 'All' category, ensure we're loading the main feed properly
-    if (category == 'All') {
-      await loadArticles(refresh: true);
-    } else {
-      await loadArticles();
-    }
-  }
-
-  // Load more articles (pagination)
-  Future<void> loadMoreArticles() async {
-    if (!_hasMorePages ||
-        _status == ArticleLoadingStatus.loading ||
-        _status == ArticleLoadingStatus.loadingMore) {
-      return;
-    }
-
-    await loadArticles();
-  }
-
-  // Refresh articles
-  Future<void> refreshArticles() async {
+    notifyListeners(); // Beri tahu UI untuk menampilkan loading
+    // Panggil loadArticles untuk mengambil data kategori baru
     await loadArticles(refresh: true);
   }
 
-  // Search articles
-  Future<void> searchArticles(String query,
-      {required Map<String, dynamic> dateFilter,
-      required String sortBy,
-      String? language}) async {
-    if (query.isEmpty) {
-      _searchQuery = '';
-      _searchResults = [];
-      _searchStatus = ArticleLoadingStatus.initial;
-      notifyListeners();
+  // Fungsi untuk memuat halaman artikel berikutnya
+  Future<void> loadMoreArticles() async {
+    // Jangan load more jika sudah tidak ada halaman lagi atau sedang loading
+    if (!_hasMorePages || _status == ArticleLoadingStatus.loading || _status == ArticleLoadingStatus.loadingMore) {
       return;
     }
-
-    if (_searchQuery == query && _searchStatus == ArticleLoadingStatus.loaded) {
-      return; // Avoid duplicate searches
-    }
-
-    _searchQuery = query;
-    _searchStatus = ArticleLoadingStatus.loading;
-
-    notifyListeners();
-
-    try {
-      _searchResults = await _repository.searchArticles(
-        query: query,
-        language: language,
-        sortBy: sortBy,
-      );
-      _searchStatus = ArticleLoadingStatus.loaded;
-
-      // Send recommendation notification for search results
-      if (_searchResults.isNotEmpty) {
-        await _backgroundService
-            .sendRecommendationNotification(_searchResults.first);
-      }
-    } catch (e) {
-      _searchStatus = ArticleLoadingStatus.error;
-      _errorMessage =
-          e is AppException ? e.message : 'Failed to search articles';
-    }
-
-    notifyListeners();
+    // Panggil loadArticles (tanpa refresh)
+    await loadArticles();
   }
 
-  // Clear search
+  // Fungsi untuk me-refresh data artikel (mengambil ulang halaman pertama)
+  Future<void> refreshArticles() async {
+    // Panggil loadArticles dengan refresh true
+    await loadArticles(refresh: true);
+  }
+
+  // Fungsi untuk mencari artikel (implementasi detail ada di repository)
+  Future<void> searchArticles(String query, {required Map<String, dynamic> dateFilter, required String sortBy, String? language}) async {
+     if (query.isEmpty) { clearSearch(); return; } // Hapus pencarian jika query kosong
+     // Hindari pencarian ganda jika query sama dan sudah selesai loading
+     if (_searchQuery == query && _searchStatus == ArticleLoadingStatus.loaded) return;
+
+     _searchQuery = query; // Simpan query pencarian
+     _searchStatus = ArticleLoadingStatus.loading; // Set status loading
+     notifyListeners(); // Update UI
+
+     try {
+       // Panggil repository untuk melakukan pencarian
+       _searchResults = await _repository.searchArticles(query: query, language: language, sortBy: sortBy);
+       _searchStatus = ArticleLoadingStatus.loaded; // Set status selesai
+
+       // Kirim notifikasi rekomendasi jika hasil ditemukan
+        if (_searchResults.isNotEmpty) {
+          final firstArticle = _searchResults.first;
+          final category = _detectArticleCategory(firstArticle);
+          await _backgroundService.sendRecommendationNotification(firstArticle, category);
+        }
+     } catch (e) {
+       _searchStatus = ArticleLoadingStatus.error; // Set status error
+       _errorMessage = e is AppException ? e.message : 'Gagal mencari artikel';
+       debugPrint("Error searching articles in provider: $e"); // Log error
+     }
+     notifyListeners(); // Update UI
+  }
+
+  // Fungsi untuk membersihkan hasil pencarian
   void clearSearch() {
     _searchQuery = '';
     _searchResults = [];
@@ -233,19 +213,30 @@ class ArticleProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  // Clear cache
+  // Fungsi untuk membersihkan cache (jika repository mendukung)
   Future<void> clearCache() async {
-    try {
-      await _repository.clearCache();
-    } catch (e) {
-      _errorMessage = 'Failed to clear cache';
-    }
-    notifyListeners();
+     try {
+       // Panggil method clearCache di repository (jika ada)
+       await _repository.clearCache();
+       _articles = []; // Kosongkan juga artikel di provider
+       _previousArticles = [];
+       _currentPage = 1;
+       _hasMorePages = true;
+       _status = ArticleLoadingStatus.initial; // Reset status
+       debugPrint("Cache cleared");
+     } catch (e) {
+       _errorMessage = 'Gagal membersihkan cache';
+       debugPrint("Error clearing cache in provider: $e"); // Log error
+     }
+     notifyListeners(); // Update UI
   }
 
+  // Override dispose untuk membersihkan resource jika perlu
   @override
   void dispose() {
-    _repository.dispose();
+    // Panggil dispose pada repository jika ada methodnya
+    // _repository.dispose();
     super.dispose();
   }
 }
+

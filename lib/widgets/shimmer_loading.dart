@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 class ShimmerLoading extends StatefulWidget {
   final bool isDark;
+  // --- PERBAIKAN: Menambahkan parameter isHeader ---
+  final bool isHeader;
 
   const ShimmerLoading({
     Key? key,
     this.isDark = false,
+    this.isHeader = false, // Default value adalah false
   }) : super(key: key);
 
   @override
@@ -31,21 +34,77 @@ class _ShimmerLoadingState extends State<ShimmerLoading>
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: 5,
-      itemBuilder: (context, index) {
+    // --- PERBAIKAN: Menampilkan widget shimmer yang berbeda berdasarkan isHeader ---
+    if (widget.isHeader) {
+      // Jika ini adalah header, tampilkan satu shimmer besar untuk slider
+      return _ShimmerHeader(
+        controller: _shimmerController,
+        isDark: widget.isDark,
+      );
+    } else {
+      // Jika bukan header, tampilkan daftar shimmer seperti sebelumnya
+      return ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: 5,
+        itemBuilder: (context, index) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: _ShimmerItem(
+              controller: _shimmerController,
+              isDark: widget.isDark,
+            ),
+          );
+        },
+      );
+    }
+  }
+}
+
+// --- BARU: Widget untuk placeholder shimmer header/slider ---
+class _ShimmerHeader extends StatelessWidget {
+  final AnimationController controller;
+  final bool isDark;
+
+  const _ShimmerHeader({
+    Key? key,
+    required this.controller,
+    required this.isDark,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final baseColor = isDark ? const Color(0xFF2C2C2C) : Colors.grey[300]!;
+    final highlightColor = isDark ? const Color(0xFF3D3D3D) : Colors.grey[100]!;
+
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
         return Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: _ShimmerItem(
-            controller: _shimmerController,
-            isDark: widget.isDark,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          child: Container(
+            height: 204, // Sesuaikan tinggi dengan slider
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              gradient: LinearGradient(
+                colors: [
+                  baseColor,
+                  highlightColor,
+                  baseColor,
+                ],
+                stops: const [0.1, 0.3, 0.4],
+                begin: const Alignment(-1.0, -0.3),
+                end: const Alignment(1.0, 0.3),
+                transform: _SlidingGradientTransform(controller.value),
+              ),
+            ),
           ),
         );
       },
     );
   }
 }
+
 
 class _ShimmerItem extends StatelessWidget {
   final AnimationController controller;

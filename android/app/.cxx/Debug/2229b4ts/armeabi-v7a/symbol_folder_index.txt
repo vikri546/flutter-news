@@ -1,0 +1,1 @@
+/home/Vikk/Documents/Project-V/Aplikasi/flutter-news/android/app/build/intermediates/cxx/Debug/2229b4ts/obj/armeabi-v7a

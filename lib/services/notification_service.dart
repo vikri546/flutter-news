@@ -18,7 +18,14 @@ class NotificationService {
     if (_initialized) return;
 
     const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initializationSettings = InitializationSettings(android: androidInit);
+    // Provide Linux settings to avoid runtime error on Linux target
+    const linuxInit = LinuxInitializationSettings(
+      defaultActionName: 'Open',
+    );
+    const initializationSettings = InitializationSettings(
+      android: androidInit,
+      linux: linuxInit,
+    );
     await _fln.initialize(initializationSettings);
 
     // Create notification channels

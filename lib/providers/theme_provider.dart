@@ -7,6 +7,10 @@ class ThemeProvider with ChangeNotifier {
   ThemeMode _themeMode = ThemeMode.system;
   bool _isThemeChanging = false;
 
+  // Define primary colors for dark/light backgrounds
+  static const Color darkColor = Color(0xFF020e13);
+  static const Color lightColor = Color(0xFFf5f6f7);
+
   ThemeProvider() {
     _loadThemePreference();
   }
@@ -14,6 +18,7 @@ class ThemeProvider with ChangeNotifier {
   ThemeMode get themeMode => _themeMode;
   bool get isThemeChanging => _isThemeChanging;
 
+  // Convenient getter for dark mode detection
   bool get isDarkMode {
     if (_themeMode == ThemeMode.system) {
       final brightness =
@@ -23,17 +28,25 @@ class ThemeProvider with ChangeNotifier {
     return _themeMode == ThemeMode.dark;
   }
 
-  void toggleTheme() {
+  // Use the custom background color depending on theme
+  Color get backgroundColor =>
+      isDarkMode ? darkColor : lightColor;
+
+  void setThemeMode(ThemeMode mode) {
     _isThemeChanging = true;
     notifyListeners();
 
-    _themeMode = isDarkMode ? ThemeMode.light : ThemeMode.dark;
+    _themeMode = mode;
     _saveThemePreference();
 
     Future.delayed(const Duration(milliseconds: 100), () {
       _isThemeChanging = false;
       notifyListeners();
     });
+  }
+
+  void toggleTheme() {
+    setThemeMode(isDarkMode ? ThemeMode.light : ThemeMode.dark);
   }
 
   Future<void> _loadThemePreference() async {

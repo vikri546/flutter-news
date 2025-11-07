@@ -20,12 +20,61 @@ class NotificationScheduler {
   Timer? _periodicTimer;
   final Random _random = Random();
 
+  // Available categories from API
+  static const List<String> _availableCategories = [
+    'HYPE',
+    'OLAHRAGA',
+    'EKBIS',
+    'MEGAPOLITAN',
+    'DAERAH',
+    'NASIONAL',
+    'INTERNASIONAL',
+  ];
+
   // Initialize scheduler
   Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
     final notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
 
     if (notificationsEnabled) {
+      await startPeriodicNotifications();
+    }
+  }
+
+  // Request permission if needed
+  Future<bool> requestPermissionIfNeeded() async {
+    return await _notificationService.requestPermissionIfNeeded();
+  }
+
+  Future<bool> isPermissionGranted() async {
+    return await areNotificationsEnabled();
+  }
+
+  // Get enabled categories from preferences
+  Future<List<String>> getEnabledCategories() async {
+    final prefs = await SharedPreferences.getInstance();
+    final enabledCategories = <String>[];
+
+    for (final category in _availableCategories) {
+      final isEnabled = prefs.getBool('notif_category_$category') ?? false;
+      if (isEnabled) {
+        enabledCategories.add(category);
+      }
+    }
+
+    // If no categories are enabled, return all categories
+    if (enabledCategories.isEmpty) {
+      return _availableCategories;
+    }
+
+    return enabledCategories;
+  }
+
+  // Update category preferences (called when user changes settings)
+  Future<void> updateCategoryPreferences() async {
+    // Restart periodic notifications to apply new preferences
+    if (await areNotificationsEnabled()) {
+      await stopPeriodicNotifications();
       await startPeriodicNotifications();
     }
   }
@@ -39,6 +88,11 @@ class NotificationScheduler {
     _periodicTimer = Timer.periodic(const Duration(hours: 4), (timer) async {
       await _sendPeriodicNotification();
     });
+
+    // Send first notification after 1 minute (for testing)
+    Timer(const Duration(minutes: 1), () async {
+      await _sendPeriodicNotification();
+    });
   }
 
   // Stop periodic notifications
@@ -47,54 +101,85 @@ class NotificationScheduler {
     _periodicTimer = null;
   }
 
-  // Send periodic notification
+  // Send periodic notification based on enabled categories
   Future<void> _sendPeriodicNotification() async {
     try {
-      // Get trending articles
-      final articles = await _getTrendingArticles();
+      // Get enabled categories
+      final enabledCategories = await getEnabledCategories();
+      if (enabledCategories.isEmpty) return;
+
+      // Pick a random category from enabled ones
+      final selectedCategory =
+          enabledCategories[_random.nextInt(enabledCategories.length)];
+
+      // Get articles from selected category
+      final articles = await _getArticlesByCategory(selectedCategory);
       if (articles.isEmpty) return;
 
-      // Randomly select notification type
-      final notificationTypes = [
-        _sendTrendingNotification,
-        _sendRecommendationNotification,
-        _sendBreakingNewsNotification,
-      ];
+      // Check if breaking news is enabled
+      final prefs = await SharedPreferences.getInstance();
+      final breakingNewsEnabled = prefs.getBool('notif_breaking_news') ?? true;
+      final topBusinessEnabled = prefs.getBool('notif_top_business') ?? true;
+      final topNewsEnabled = prefs.getBool('notif_top_news') ?? true;
 
-      final selectedType =
-          notificationTypes[_random.nextInt(notificationTypes.length)];
-      await selectedType(articles);
+      // Determine notification type based on settings and category
+      if (breakingNewsEnabled &&
+          (selectedCategory == 'NASIONAL' || selectedCategory == 'INTERNASIONAL')) {
+        await _sendBreakingNewsNotification(articles, selectedCategory);
+      } else if (topBusinessEnabled && selectedCategory == 'EKBIS') {
+        await _sendTrendingNotification(articles, selectedCategory);
+      } else if (topNewsEnabled) {
+        await _sendRecommendationNotification(articles, selectedCategory);
+      }
     } catch (e) {
       print('Error sending periodic notification: $e');
     }
   }
 
-  // Get trending articles
-  Future<List<Article>> _getTrendingArticles() async {
+  // Get articles by specific category
+  Future<List<Article>> _getArticlesByCategory(String category) async {
     try {
       final articles = await _articleRepository.getArticlesByCategory(
-        'All',
+        category,
         forceRefresh: true,
         page: 1,
         pageSize: 10,
-        country: 'us',
       );
 
       // Shuffle and take first 3 articles
       articles.shuffle(_random);
       return articles.take(3).toList();
     } catch (e) {
+      print('Error fetching articles for category $category: $e');
+      return [];
+    }
+  }
+
+  // Get trending articles (from all enabled categories)
+  Future<List<Article>> _getTrendingArticles() async {
+    try {
+      final enabledCategories = await getEnabledCategories();
+      if (enabledCategories.isEmpty) return [];
+
+      // Pick a random category
+      final category =
+          enabledCategories[_random.nextInt(enabledCategories.length)];
+
+      return await _getArticlesByCategory(category);
+    } catch (e) {
       print('Error fetching trending articles: $e');
       return [];
     }
   }
 
-  // Send trending notification
-  Future<void> _sendTrendingNotification(List<Article> articles) async {
+  // Send trending notification with category info
+  Future<void> _sendTrendingNotification(
+      List<Article> articles, String category) async {
     if (articles.isEmpty) return;
 
     final article = articles[_random.nextInt(articles.length)];
-    final title = 'Trending Now';
+    final categoryName = _getCategoryDisplayName(category);
+    final title = 'Trending in $categoryName';
     final body = _truncateText(article.title, 100);
 
     await _notificationService.showTrendingNotification(
@@ -104,12 +189,14 @@ class NotificationScheduler {
     );
   }
 
-  // Send recommendation notification
-  Future<void> _sendRecommendationNotification(List<Article> articles) async {
+  // Send recommendation notification with category info
+  Future<void> _sendRecommendationNotification(
+      List<Article> articles, String category) async {
     if (articles.isEmpty) return;
 
     final article = articles[_random.nextInt(articles.length)];
-    final title = 'Recommended for You';
+    final categoryName = _getCategoryDisplayName(category);
+    final title = 'New in $categoryName';
     final body = _truncateText(article.title, 100);
 
     await _notificationService.showRecommendationNotification(
@@ -119,12 +206,14 @@ class NotificationScheduler {
     );
   }
 
-  // Send breaking news notification
-  Future<void> _sendBreakingNewsNotification(List<Article> articles) async {
+  // Send breaking news notification with category info
+  Future<void> _sendBreakingNewsNotification(
+      List<Article> articles, String category) async {
     if (articles.isEmpty) return;
 
     final article = articles[_random.nextInt(articles.length)];
-    final title = 'Breaking News';
+    final categoryName = _getCategoryDisplayName(category);
+    final title = 'Breaking: $categoryName';
     final body = _truncateText(article.title, 100);
 
     await _notificationService.showBreakingNewsNotification(
@@ -132,6 +221,28 @@ class NotificationScheduler {
       body,
       payload: article.url,
     );
+  }
+
+  // Get display name for category
+  String _getCategoryDisplayName(String category) {
+    switch (category) {
+      case 'HYPE':
+        return 'Hype';
+      case 'OLAHRAGA':
+        return 'Olahraga';
+      case 'EKBIS':
+        return 'Ekonomi & Bisnis';
+      case 'MEGAPOLITAN':
+        return 'Megapolitan';
+      case 'DAERAH':
+        return 'Daerah';
+      case 'NASIONAL':
+        return 'Nasional';
+      case 'INTERNASIONAL':
+        return 'Internasional';
+      default:
+        return category;
+    }
   }
 
   // Truncate text to specified length
@@ -142,9 +253,15 @@ class NotificationScheduler {
 
   // Send immediate notification (for testing)
   Future<void> sendTestNotification() async {
-    final articles = await _getTrendingArticles();
+    final enabledCategories = await getEnabledCategories();
+    if (enabledCategories.isEmpty) return;
+
+    final category =
+        enabledCategories[_random.nextInt(enabledCategories.length)];
+    final articles = await _getArticlesByCategory(category);
+
     if (articles.isNotEmpty) {
-      await _sendTrendingNotification(articles);
+      await _sendTrendingNotification(articles, category);
     }
   }
 
@@ -155,8 +272,10 @@ class NotificationScheduler {
 
     if (enabled) {
       await startPeriodicNotifications();
+      await _backgroundService.initialize();
     } else {
       await stopPeriodicNotifications();
+      await _backgroundService.stopBackgroundTask();
       await _notificationService.cancelAllNotifications();
     }
   }
@@ -167,11 +286,19 @@ class NotificationScheduler {
     return prefs.getBool('notifications_enabled') ?? true;
   }
 
-  // Send notification for new article
-  Future<void> sendNewArticleNotification(Article article) async {
+  // Send notification for new article in specific category
+  Future<void> sendNewArticleNotification(
+      Article article, String category) async {
     if (!await areNotificationsEnabled()) return;
 
-    final title = 'New Article';
+    // Check if category notification is enabled
+    final prefs = await SharedPreferences.getInstance();
+    final categoryEnabled = prefs.getBool('notif_category_$category') ?? false;
+
+    if (!categoryEnabled) return;
+
+    final categoryName = _getCategoryDisplayName(category);
+    final title = 'New Article in $categoryName';
     final body = _truncateText(article.title, 100);
 
     await _notificationService.showBreakingNewsNotification(
@@ -181,11 +308,19 @@ class NotificationScheduler {
     );
   }
 
-  // Send notification for trending article
-  Future<void> sendTrendingArticleNotification(Article article) async {
+  // Send notification for trending article in specific category
+  Future<void> sendTrendingArticleNotification(
+      Article article, String category) async {
     if (!await areNotificationsEnabled()) return;
 
-    final title = 'Trending';
+    // Check if category notification is enabled
+    final prefs = await SharedPreferences.getInstance();
+    final categoryEnabled = prefs.getBool('notif_category_$category') ?? false;
+
+    if (!categoryEnabled) return;
+
+    final categoryName = _getCategoryDisplayName(category);
+    final title = 'Trending in $categoryName';
     final body = _truncateText(article.title, 100);
 
     await _notificationService.showTrendingNotification(
